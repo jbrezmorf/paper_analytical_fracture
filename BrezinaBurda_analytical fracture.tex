@@ -1,0 +1,643 @@
+\documentclass[a4paper,10pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{stmaryrd}
+\usepackage{color}
+
+\newtheorem{prop}{Proposition}
+
+\def\Laplace{\Delta}
+\def\prtl{\partial} % partial deriv.
+\def\grad{\nabla}
+\def\vc#1{\mathbf{\boldsymbol{#1}}}     % vector
+\def\todo#1{{TODO:\color{red}#1}}
+\def\ol#1{\overline{#1}}
+
+%opening
+\title{Analytical solution to a single fracture test problem
+%\thanks{This work was supported by the Technology Agency of the Czech Republic under the project no. TA01021331. }
+}
+\author{%
+Jan B\v rezina
+\thanks{Technical University in Liberec, Studentsk\'a 2, Liberec, Czech Republic ({\tt jan.brezina@tul.cz}).},
+Pavel Burda
+\thanks{Czech Technical University, (pavel.burda@fs.cvut.cz)}
+}
+
+
+
+
+
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+We consider a model of the flow in fractured porous media based on the dual continuum approach and 
+explicit description of the fracture zones by lower-dimensional objects. For this model, we 
+present the mixed-hybrid formulation and discretization using Raviart-Thomas finite elements. 
+In particular, we present two new methods for the discrete coupling between equations on meshes of different dimensions
+with arbitrary overlapping. Convergence properties of these methods are demonstrated by numerical tests.
+\end{abstract}
+
+%\begin{keywords} 
+%fracture flow, mortar methods, mixed-hybrid finite elements
+%\end{keywords}
+
+%\begin{AMS}
+%15A15, 15A09, 15A23
+%\end{AMS}
+
+%\pagestyle{myheadings}
+%\thispagestyle{plain}
+%\markboth{Jan B\v rezina}{Mortar methods and MHFEM for elliptic problems on complex geometries.}
+
+
+\section{Introduction}
+Fractures, cracks, fissures, faults and other discontinuities are ubiquitous in real rock formations especially granitoids.  
+Fractures present a challenge for subsurface water flow modeling as they have small volume but large permeability with
+potentially large impact on the pressure and velocity fields. Alternatively the filled fractures can behave as barriers. 
+
+Fractures occurs on wide range of scales. The small scale fractures could be homogenized, while the scales comparable to 
+the dimensions of a computational domain should be captured explicitly.
+
+
+
+small cross-section area. Finally, we obtain system of equations on the domains of different dimension, coupled through the boundary 
+conditions. This approach has been proposed by several authors, see e.g. \cite{reichenberger_mixed-dimensional_2006} or
+homogenization arguments in \cite{martin_modeling_2005}.  
+
+Even after this simplification, it could be difficult to obtain the mesh where the elements on the fractures match the sides of 
+the elements of a surrounding continuum. The aim of this paper is to present two mortar-like methods for mixed-hybrid formulation
+that relax this compatibility condition. Since these methods can not capture the jump in the pressure over the fractures, we have
+to assume continuous pressure in our model. This is not completely unrealistic, since such a model can be viewed 
+as a dual continuum model
+in spirit of Gerke and Genuchten \cite{GerkeGenuchten1993a} where the fracture zone is explicitly localized. 
+
+
+
+
+\section{Test problems}
+Main result of the paper is derivation of the strong analytical solution for two test problems with coupling between continuum and a fracture.
+A Darcy flow is considered  on a square 2D domain $\Omega_2 = (-1,1)\times(-1,1)$
+with a horizontal fracture $\Omega_1 = { (x,0) : x\in (-1,1)}$. The fracture splits $\Omega_2$ into upper and 
+lower part $\Omega_2^+$ and $\Omega_2^-$, respectively.
+The stationary Darcy flow is driven by the same equation on all three domains:
+\begin{align}
+  \label{eq:Darcy_common}
+  -k_2 \Laplace p^+_2(x,y) &= 0 \qquad &&\text{ on }\Omega_2^+,\\
+  -k_2 \Laplace p^-_2(x,y) &= 0 \qquad &&\text{ on }\Omega_2^-,\\
+  -k_1 p_1''(x) &= f(x) \qquad &&\text{ on }\Omega_1.
+  \label{eq:Darcy_common_c}
+\end{align}
+Where $p_d$, $d=1,2$ is the pressure and $f$ is the communication term that will be specified later. 
+We consider constant conductivities $k_2$, $k_1$ on $\Omega_2$ and $\Omega_1$, respectively.
+
+The homogeneous Neumann condition is set on the left and the right side of $\Omega_2$,
+while the Dirichlet condition is set on the top and bottom and at the tips of the fracture.
+We denote:
+\begin{align*}
+   \Gamma^N_2 &= \{(x,y)\, :\, x\in\{-1, 1\},\ y\in (-1, 1),\ y\ne 0\},\\
+   \Gamma^N_2 &= \{(x,y)\, :\, x\in (-1, 1),\ y\in \{-1, 1\}\},\\
+   \Gamma_1   &= \prtl \Omega_1 = \{(-1, 0),\ (1, 0)\}. 
+\end{align*}
+Then we prescribe following boundary conditions
+\begin{align}
+  \label{eq:bc_common}
+  \prtl_x p_2(x,y) &= 0  &&\text{ on } \Gamma_2^N\\
+  p_2(x,y) &= P_2        &&\text{ on } \Gamma_2^D\\
+  p_1(x) &= P_1          &&\text{ on } \Gamma_1.
+  \label{eq:bc_1}
+\end{align}
+
+In order to complete the problem we must prescribe boundary conditions on the fracture and specify the source term $f$. Here we 
+distinguish two cases: {\emph a conductive barrier} and {\emph a barrier fracture}.
+
+
+{\bf Conductive fracture.} In this case we assume a fracture with similar or higher conductivity then in the continuum, $k_1 \ge k_2$.
+In such case we can assume continuity of the pressure across the fracture. However we keep difference between $p_2$ and $p_1$ on the fracture.
+We set:
+\begin{align}
+  \label{eq:c_coupling_a}
+  p_2^+ &= p_2^-                &&\text{ on }\Omega_1,\\
+  -k_2 (-\prtl_y p_2^+ + \prtl_y p_2^-) &= f(x)         &&\text{ on }\Omega_1,\\
+  f(x) &= \sigma (p_2(x,0) - p_1(x)),   &&
+  \label{eq:c_coupling_c}
+\end{align}
+where $\sigma$ is a coupling parameter, usually $\sigma \approx k_1 / \delta$ with $\delta$ standing for the fracture cross-section. 
+Solution of this case is discussed in Section \ref{sec:continuous_frac}.
+
+\todo{Uvazovat misto $\sigma$ $2\sigma$ kvuli ekvivalenci s barierovym modelem. Poznamka, ze pro velka $\sigma$ je spojity model limita barieroveho modelu }    
+
+
+{\bf Barrier fracture.} Other case is a fracture with significantly smaller conductivity compared to the surrounding continuum. In this case
+the pressure $p_2$ is discontinuous across the fracture and two sides of the fracture acts independently. We also 
+distinguish conductivities $k_2^+$, $k_2^-$ and boundary pressure $P_2^+$, $P_2^-$ for the upper and lower domains $\Omega_2^+$, $\Omega_2^-$, 
+respectively. The coupling on the fracture is prescribed by the boundary conditions:
+\begin{align}
+  \label{eq:bc_barrier_p}  
+  - k_2^+ \grad p_2^+\cdot \vc n^+(x,0) &= k_2^+ \prtl_y p_2^+(x) = f^+(x) 
+                    &&\text{ on }\Gamma^{+},\\
+  \label{eq:bc_barrier_m}
+  - k_2^- \grad p_2^-\cdot \vc n^-(x,0) &= -k_2^- \prtl_y p_2^-(x) = f^-(x) 
+                    &&\text{ on }\Gamma^{-},
+\end{align}
+with $\Gamma^{+}$ and $\Gamma^{-}$ denoting boundary of $\Omega_2^+$ and $\Omega_2^-$, respectively, collocated with $\Omega_1$.
+The communication term is:
+\begin{equation}
+  \label{eq:coupling_barrier}
+  f(x) = f^+(x) + f^-(x),\quad f^{+/-} = \sigma^{+/-} (p^{+/-}_2(x,0) - p_1(x)).
+\end{equation}
+Solution to this system is discussed in Section \ref{sec:barrier_frac}. 
+
+\section{Conductive fracture }
+\label{sec:continuous_frac}
+We shall derive an analytical solution to the system $(\ref{eq:Darcy_common} - \ref{eq:bc_1})$ with the coupling conditions 
+$(\ref{eq:c_coupling_a} - \ref{eq:c_coupling_c})$. Symmetry of the problem in 
+both $x$ and $y$ direction allows us to solve equivalent reduced problem on $\widetilde\Omega_2=(0,1)\times(0,1)$ and  
+$\widetilde\Omega_1$. Moreover we flip the reduced domain in the $x$ direction setting the Dirichlet  condition on the fracture for $x=0$
+and the homegoenous Neumann condition at $x=1$ to impose the symmetry. This transformation slightly simplify certain formulas.
+All equations are preserved with exception of the half flux on the fracture. The equivalent system  reads:
+\begin{align}
+    \label{eq:cc_darcy_2d}
+    -k_2 \Laplace p_2(x,y) &= 0         &&\text{on }\widetilde\Omega_2 \\
+    \label{eq:cc_darcy_1d}
+    -k_1 p_1''(x) &= f(x)               &&\text{on }\widetilde\Omega_1
+\end{align}
+with boundary conditions:    
+
+\begin{equation}
+    \label{eq:cc_bc_x}
+    p_2(x, 1) = P_2, \quad
+    k_2\prtl_y p_2(x,0) = \frac{f(x)}{2}
+                        = \sigma(p_2(x,0) - p_1(x))
+\end{equation}
+for  $x\in (0,1)$,
+\begin{equation}
+    \label{eq:cc_bc_y}
+    \prtl_x p_2(0,y) = \prtl_x p_2(1,y) = 0    
+\end{equation}
+for $y \in (0, 1)$ and finally
+\begin{equation}
+    \label{eq:cc_bc_1}
+    p_1'(1) = 0, \quad  p_1(0) = P_1. 
+\end{equation}
+
+\begin{prop}
+The solution $p_1(x)$ and $p_2(x,y)$ to the system $(\ref{eq:cc_darcy_2d} - \ref{eq:cc_bc_1})$
+can be expressed in from of Fourier series:
+\begin{equation}
+    \label{eq:p2_series}
+    p_2(x,y) = P_2 + B_0(y-1) -2B_0 \sum_{n=1}^\infty a_n \cos(\pi n x) {\rm sinh} \big(\pi n(1-y)\big)  \ \ ,
+\end{equation}
+%
+\begin{equation}
+    \label{eq:p2_series}
+    p_1(x) = P_2-B_0 -u_0 \cosh(x/k) -2B_0 \sum_{n=1}^\infty  u_n \cos(\pi n x) 
+\end{equation}
+
+Computing $p_1(1)$:
+\[
+    P_2
+    - \frac{P_2 - P_1}{1 + 2  U + \frac{k_2}{\sigma k} \frac{\cosh(1/k)}{\sinh(1/k)}}  \left(
+        1
+        +\frac{k_2 }{\sigma k\sinh(1/k)} \cosh(1/k) 
+        +2 \sum_{n=1}^\infty  u_n \cos(\pi n) 
+      \right)
+\]
+
+where we denote:
+\[
+    k = \sqrt{\frac{k_1}{2\sigma}}, 
+\]    
+and use following coefficients:
+
+\begin{equation}
+    \label{eq:an}
+    a_n = \frac{k_2}{ k_2 \pi n \cosh(\pi n) \big(1 + (k n \pi)^2\big) 
+    + \sigma (k n \pi)^2 \sinh(\pi n)} \ , 
+\end{equation}
+
+\begin{equation}
+    \label{eq:u0}
+    u_0 = -\frac{k_2 B_0}{\sigma k\sinh(1/k)}.
+\end{equation}
+
+\begin{equation}
+    \label{eq:un}
+    u_n = \frac{a_n \sinh(n \pi)}{1 + (k n \pi)^2}, 
+\end{equation}
+
+
+
+
+and constants:
+\begin{equation}
+     \label{eq:b0}
+     B_0 = \frac{P_2 - P_1}{1 + 2  U + \frac{k_2}{\sigma k} \frac{\cosh(1/k)}{\sinh(1/k)}} 
+\end{equation}
+\begin{equation}
+    \label{eq:U}
+    U =  \sum_{n=1}^{\infty} u_n.
+\end{equation}
+
+\end{prop}
+
+We shall apply the Fourier method \cite{??}, starting with separation of variables for the equation \eqref{eq:cc_darcy_2d}.  
+
+\subsection{\bf Fourier method for 2D equation}
+\label{sec:p2_conductive}
+
+Considering a solution in form:
+\begin{equation}
+    \label{eq:sep_vars}
+    p_2(x,y) = X(x)Y(y) 
+\end{equation}
+the equation \eqref{eq:cc_darcy_2d} gives us two equations:
+\[
+\frac{X''}{X} = -\frac{Y''}{Y} = L\ ,
+\]
+$L$ being a real constant. Applying homogeneous Neumann boundary conditions \eqref{eq:cc_bc_y}
+we get possible solutions $X(x)$ in the form: 
+\begin{equation}
+    \label{eq:general_x}
+    X_n(x) = \tilde A_n + \tilde B_n \cos (n\pi x)\qquad \text{ for }n=0,1, \dots
+\end{equation}
+where $\tilde A_n$, $\tilde B_n$ are arbitrary real constants and $L$ is quantizied to values:
+\[
+    L= - n^2 \pi^2.
+\]
+
+
+Next we plug $L$ in the equation for $Y(y)$ to get all solutions:
+\begin{align}
+Y_0(y) &= \tilde C_0 + \tilde D_0 y, \nonumber \\
+\label{eq:general_y}
+Y_n(y) &= \tilde C_n e^{n\pi y}+ \tilde D_n e^{-n\pi y}\qquad \text{ for } n =1, \dots
+\end{align}
+where $\tilde A_n, \tilde B_n$ for $n=0,1,\dots$ are arbitrary real constants.
+
+Combining \eqref{eq:sep_vars}, \eqref{eq:general_x}, \eqref{eq:general_y} we can write the solution $p_2$ as:
+\begin{equation}
+    \label{eq:p2_1}
+    p_2(x, y) = A_0 + B_0 y + \sum ^{\infty}_{n=1} \big(C_n + \cos (n\pi x)\big) 
+            \frac{1}{2}\big(A_n e^{n\pi (y-1)} + B_n e^{-n\pi (y-1)}\big).
+\end{equation}
+Then the Dirichelt condition $(\ref{eq:cc_bc_x}a)$ yields:
+\[
+    P_2 = A_0 + B_0 + \sum ^{\infty}_{n=1} \big(C_n + \cos (n\pi x)\big) 
+            \frac{A_n  + B_n}{2}.
+\]
+for all $x\in (0, 1)$ and thus:
+\[
+    A_0 + B_0 = P_2, \quad\text{ and } \quad A_n+B_n = 0.
+\]
+Then \eqref{eq:p2_1} can be simplified to the final form \eqref{eq:p2_series} where we yet have to determine $B_0$ and coefficients $a_n$.
+
+
+\subsection{Pressure on fracture}
+\label{sec:p1_conductive}
+
+ Next step is a solution to the equation on fracture, i.e. \eqref{eq:cc_darcy_1d}. 
+ Substituting for $f$ using $(\ref{eq:cc_bc_x})$ and then for $p_2$ from \eqref{eq:p2_series}
+ we arrive at: 
+\begin{equation}
+    \label{eq:p1_equation}
+    -k^2 p_1''(x) + p_1 (x) = P_2 - B_0 - 2 B_0 \sum ^{\infty}_{n=1} a_n \sinh(n\pi)\, \cos (n\pi x).
+\end{equation}
+with $k = \sqrt{k_1 / (2 \sigma)}$.
+
+Solution to:
+\[
+    - a P''(x) + P(x) = \cos(n \pi x) 
+\]    
+is 
+\[
+    P(x) = \frac{\cos(n \pi x)}{1+an^2\pi^2}.
+\]
+Using linearity of the equation we obtain the general form of $p_1$ as:
+\begin {equation}
+    \label{eq:p1_series}        
+    p_1(x) = c^+ e^{x/k} + c^- e^{-x/k} + P_2 - B_0 
+    - 2 B_0 \sum^{\infty}_{n=1} u_n \cos (n\pi x).
+\end {equation}
+with $u_n$ given by \eqref{eq:un}. Then the boundary conditions \eqref{eq:cc_bc_1} yield:
+\begin{align*}
+P_1 &= p_1(0) = c^+ + c^- + P_2 - B_0 - 2 B_0 U, \\
+0 &= p_1'(1) = \frac{1}{k}(c^+e^{1/k} - c^- e^{-1/k}) 
+\end{align*}
+with $U$ given by \eqref{eq:U}. Solving for $c^+$ and $c^-$ we get:
+\[
+  c^{+/-} = \frac{P_1 - P_2 + B_0(1 + 2 U}{2\cosh(1/k)} e^{-/+\frac{1}{k}}.
+\]
+Then \eqref{eq:p1_series} gives 
+\begin{equation}
+    \label{eq:p1_series_tmp}
+    p_1(x) = P_2 -  B_0 + u_0 \cosh((1-x)/k) - 2B_0 \sum_{n=1}^\infty  u_n \cos(\pi n x) 
+\end{equation}
+which is \eqref{eq:p1_series} but with 
+\begin{equation}
+    \label{eq:u0_def}    
+    u_0 = \frac{P_1 - P_2 + B_0 + 2 B_0 U}{\cosh(1/k)}.
+\end{equation}
+
+
+
+\subsection{Resolving the coupling}
+\label{sec:cont_coupling}
+
+Last relation that we have to consider is the boundary condition $(\ref{eq:cc_bc_x}b)$. To this end we plug in the relations \eqref{eq:p2_series}, 
+\eqref{eq:p1_series_tmp} for $p_2$, $p_1$  and we group the terms for remaining unknowns on the left hand side. After straight forward
+manipulation we obtain:
+% \[
+%     \frac{B_0 k_2}{\sigma} + 2 B_0 \sum_{n=1}^\infty 
+%         \Big[ \frac{k_2}{\sigma} n\pi  \cosh(\pi n) 
+%         + \sinh(\pi n)
+%         - \frac{\sinh(n \pi)}{1 + (k n \pi)^2} 
+%         \Big] a_n
+%         \cos(\pi n x)        
+%        = - u_0 \cosh(x/k) 
+% \]
+
+
+
+\begin{equation}
+    \label{eq:fourier_coupling}
+    \frac{{\cal A}_0}{2} + \sum^{\infty}_{n=1} {\cal A}_n \cos (n\pi x) =  - u_0 \cosh(x/k).
+\end{equation}
+with
+\begin{equation}
+    \label{eq:fourier_A0}
+    {\cal A}_0 = \frac{2 k_2 B_0}{\sigma} 
+\end{equation}
+
+
+\begin{equation}
+    \label{eq:fourier_An} 
+        {\cal A}_n = 2B_0 \Bigl[ \frac{k_2}{\sigma} n\pi \cosh(n\pi) - \frac{\sinh(n \pi)}{1 + (k n \pi)^2}  
+    + \sinh(n \pi) \Bigr]a_n
+\end{equation}
+
+for $n=1, \dots$. The left hand side of \eqref{eq:fourier_coupling} is the Fourier series, thus we determine
+remaining unknowns $B_0$, $A_n$ by computing Fourier of the function on the right hand side and comparing coefficients.
+
+For the zero term we have:
+\[
+{\cal A}_0 = -2 u_0 \int _0^1 \cosh(x/k) dx =
+- 2 u_0 k\sinh 1/k.
+\]
+which compared to \eqref{eq:fourier_A0} gives us \eqref{eq:u0}.
+
+
+For other terms, we integrate by parts to get:
+\[
+{\cal A}_n = -2 u_0\int _0^1 \cosh(x/k) \cos (n\pi x) dx 
+= -\frac{2u_0 k}{1+(k n \pi)^2}\sinh(1/k).
+\]
+We plug \eqref{eq:b0} into \eqref{eq:fourier_An} and compare it with just computed integral to obtain
+formula \eqref{eq:an} for coeeficients $a_n$.
+The only remaining unknown is $B_0$ which we determine by comparing \eqref{eq:u0_def} and \eqref{eq:u0}.
+Straight forwared calculation leads to \eqref{eq:b0}.
+
+
+\section{Barrier fracture}
+\label{sec:barrier_frac}
+The case with discontinuous $p_2$ accross the fracture is solved by the similar procedure as the continuous case, 
+but is slightly more technical. Considering the $y$ axis symmetry of the problem $(\ref{eq:Darcy_common} - \ref{eq:bc_1})$ and 
+the coupling $(\ref{eq:bc_barrier_p} - \ref{eq:coupling_barrier})$, we can consider the same system of equations 
+on reduced domains $\Omega_2^+ = (0,1)\times (0,1)$, $\Omega_2^- = (0,1)\times(-1,0)$,
+$\Omega_1 = (0,1)$. To impose the symmetry we consider homogeneous Neumann boundary condition on the $y$ axis $\{(0,y)\}$.
+
+Repeating arguments from Section \ref{sec:p2_conductive} we obtain Fourier expansion for $p_2^+$ and $p_2^-$ similar to \eqref{eq:p2_series}:
+\begin{align}
+    \label{eq:p2_barrier_p}
+    p_2^+(x,y) &= P_2^+ + B_0^+(y-1) - u_0\sum_{n=1}^\infty a_n^+ \cos(\pi n x) {\rm sinh} \big(\pi n(1-y)\big),\\ 
+    \label{eq:p2_barrier_m}
+    p_2^-(x,y) &= P_2^- + B_0^-(y-1) - u_0\sum_{n=1}^\infty a_n^- \cos(\pi n x) {\rm sinh} \big(\pi n(1-y)\big).
+\end{align}
+with some variable $u_0$ to be specified later.
+
+The equation for $p_1$ on $\Omega_1$ can be converted to the form similar to \eqref{eq:p1_equation}:
+\begin{equation}
+    \label{eq:p1_barrier_equation}
+    - \ol{k}  p_1''(x) + p_1(x) = \ol{P}_2 - \ol{B}_0 - u_0\sum_{n=1}^{\infty} \ol{a}_n \cos(n \pi x) \sinh(n \pi)
+\end{equation}
+with help of averaged variables:
+
+% \begin{align}
+%     \label{eq:avg_sigma}
+%     \ol{\sigma} &= (\sigma^+ + \sigma^-), \\
+%     \label{eq:avg_k}
+%     \ol{k} &= \sqrt{k_1/\ol{\sigma}},\\
+%     \label{eq:avg_P2}
+%     \ol{P}_2 &= \frac{\sigma^+ P_2^+ + \sigma^- P_2^-}{\ol{\sigma}}, \\
+%     \label{eq:avg_B0}
+%     \ol{B}_0 &= \frac{\sigma^+ B_0^+ + \sigma^- B_0^-}{\ol{\sigma}}, \\
+%     \label{eq:avg_an}
+%     \ol{A}_n &= \frac{\sigma^+ A_n^+ + \sigma^- A_n^-}{\ol{\sigma}}.  
+% \end{align}
+
+\begin{gather*}
+    \ol{\sigma} = (\sigma^+ + \sigma^-), \qquad
+    \ol{k} = \sqrt{k_1/\ol{\sigma}}, \qquad
+    \ol{P}_2 = \frac{\sigma^+ P_2^+ + \sigma^- P_2^-}{\ol{\sigma}}, \\
+%    
+    \ol{B}_0 = \frac{\sigma^+ B_0^+ + \sigma^- B_0^-}{\ol{\sigma}}, \qquad
+    \ol{a}_n = \frac{\sigma^+ a_n^+ + \sigma^- a_n^-}{\ol{\sigma}}.  
+\end{gather*}
+
+Then we can repeat derivation in Section \ref{sec:p1_conductive} to get $p_1$ expansion that closely follows
+\eqref{eq:p1_series_tmp}:
+
+\begin{equation}
+    \label{eq:barrier_p1_series}
+    p_1(x) = \ol{P}_2 -  \ol{B}_0 + u_0 \cosh(x/\ol{k}) - u_0 \sum_{n=1}^\infty  u_n \cos(\pi n x) 
+\end{equation}
+where finally identify $u_0$ as:
+\begin{equation}
+    \label{eq:barrier_u0_def}    
+    u_0 = \frac{P_1 - \ol{P}_2 + \ol{B}_0 + u_0 U}{\cosh(1/\ol{k})},
+\end{equation}
+and we set:
+\begin{equation}
+    \label{eq:barriaer_un}
+    u_n = \frac{\ol{a}_n \sinh(n \pi)}{1 + (\ol{k} n \pi)^2}, \qquad
+    U =  \sum_{n=1}^{\infty} u_n.
+\end{equation}
+
+\subsection{Coupling}
+
+Similarly as in Section \ref{sec:cont_coupling}, we plug expansion of $p_2^+$, $p_2^-$, and $p_1$ into \eqref{eq:bc_barrier_p} and \eqref{eq:bc_barrier_m}. 
+We group the terms to get Fourier expansion on the left hand side and a known function of $x$ on the right hand side.
+In particular on  $\Gamma^+$ we have:
+% \[
+%   \frac{k_2^+ B_0^+}{\sigma^+} - P_2^+ + \ol{P}_2) + B_0^+ - \ol{B}_0
+%   +\sum_{n=1}^{\infty} \Big[
+%         2 \frac{k_2^+ B_0^+}{\sigma^+}  a_n^+ ( n \pi)  \cosh(n \pi) 
+%        + 2B_0^+  a_n^+  \sinh(\pi n)   
+%        -2\ol{B}_0 u_n   
+%         \Big]
+%         \cos(n \pi x)  
+%   = 
+%    - u_0 \cosh(x/\ol{k})
+% \]
+% 
+
+\begin{equation}
+    \label{eq:fourier_coupling}
+    \frac{{\cal A}_0^+}{2} + \sum^{\infty}_{n=1} {\cal A}_n^+ \cos (n\pi x) =  - u_0 \cosh(x/ \ol{k}).
+\end{equation}
+with
+\begin{align}
+    \label{eq:calA0_1}
+    \frac{{\cal A}_0^+}{2} &= \frac{k_2^+ B_0^+}{\sigma^+} - P_2^+ + \ol{P}_2 + B_0^+ - \ol{B}_0\\
+    \label{eq:calAn_1}
+    {\cal A}_n^+          &=  u_0a_n^+ \Big( n \pi \frac{k_2^+ }{\sigma^+}  \cosh(n \pi) 
+        +     \sinh(\pi n)  \Big) 
+        - u_0u_n   
+\end{align}
+
+Reusing calculation of the Fourier coefficients of the right hand side we have: 
+\begin{align}
+    \label{eq:calA0_2}
+    {\cal A}_0^+ &= - 2 u_0 \ol{k}\sinh( 1/\ol{k} ), \\
+    \label{eq:calAn_2}
+    {\cal A}_n^+ &=  -\frac{2u_0 \ol{k}}{1+(\ol{k} n \pi)^2}\sinh(1/\ol{k}).
+\end{align}
+Analogous relations hold for the lower side on $\Gamma^-$.
+
+Now we combine \eqref{eq:calAn_1} and \eqref{eq:calAn_2}, we cancel $u_0$, and we substitute for $u_n$ using \eqref{eq:barriaer_un}.
+Performing the same operation for the ${\cal A}_n^-$  we obtain a system to determine $a_n^+$, $a_n^-$:
+
+\begin{equation}
+    \label{eq:an_system}
+    \begin{pmatrix} 
+            X_n^{00} & X_n^{01} \\ 
+            X_n^{10} & X_n^{11}
+    \end{pmatrix}
+    \begin{pmatrix} 
+        a_n^+  \\ 
+        a_n^-     
+    \end{pmatrix}
+     =  
+    \begin{pmatrix} 
+        y_n \\ 
+        y_n
+    \end{pmatrix}
+\end{equation}
+where
+% \[
+% -\frac{2u_0 \ol{k}}{1+(\ol{k} n \pi)^2}\sinh(1/\ol{k}) = A_n^+ \Big( n \pi \frac{k_2^+ }{\sigma^+}  \cosh(n \pi) 
+%         +     \sinh(\pi n)  \Big) 
+%         - \frac{\sigma^+ A_n^+}{\ol{\sigma}}\frac{\sinh(n \pi)}{1 + (\ol{k} n \pi)^2}
+%         - \frac{\sigma^- A_n^-}{\ol{\sigma}}\frac{\sinh(n \pi)}{1 + (\ol{k} n \pi)^2}
+% \]
+% 
+% \[
+% A_n^+ \Big( n \pi \frac{k_2^+ }{\sigma^+}  \cosh(n \pi) 
+%         +     \sinh(\pi n)  - \frac{\sigma^+ }{\ol{\sigma}}\frac{\sinh(n \pi)}{1 + (\ol{k} n \pi)^2}\Big)     
+%         - A_n^-\frac{\sigma^- }{\ol{\sigma}}\frac{\sinh(n \pi)}{1 + (\ol{k} n \pi)^2}
+%         =
+%         -\frac{2u_0 \ol{k}}{1+(\ol{k} n \pi)^2}\sinh(1/\ol{k})
+% \]
+
+\begin{align}
+    y_n     &= -\frac{2 \ol{k}}{1+(\ol{k} n \pi)^2}\sinh(1/\ol{k}), \\
+    X_n^{00}  &= n \pi \frac{k_2^+ }{\sigma^+}  \cosh(n \pi) 
+              + \sinh(\pi n)  - \frac{\sigma^+ }{\ol{\sigma}}\frac{\sinh(n \pi)}{1 + (\ol{k} n \pi)^2}, \\
+    X_n^{01}  &= \frac{\sigma^- }{\ol{\sigma}}\frac{\sinh(n \pi)}{1 + (\ol{k} n \pi)^2}, \\
+    X_n^{11}  &= n \pi \frac{k_2^- }{\sigma^-}  \cosh(n \pi) 
+              + \sinh(\pi n)  - \frac{\sigma^- }{\ol{\sigma}}\frac{\sinh(n \pi)}{1 + (\ol{k} n \pi)^2}, \\
+    X_n^{10}  &= \frac{\sigma^+ }{\ol{\sigma}}\frac{\sinh(n \pi)}{1 + (\ol{k} n \pi)^2}. 
+\end{align}
+The system matrix is strictly diagonally dominant providing $k_2^{+/-}$, $\sigma^{+/-}$, $k_1$ are positive.
+As the right hand side is negative the coeeficients $a_n^{+/-}$ are all negative as well.
+
+
+Now we express $u_0$ from \eqref{eq:barrier_u0_def}:
+\[
+    u_0 = \frac{P_1 - \ol{P}_2 + \ol{B}_0}{\cosh(1/\ol{k}) - U}
+\]
+and we plug it into  \eqref{eq:calA0_2} which we compare to \eqref{eq:calA01}. Taking a same procedure for ${\cal A}_0^-$ we
+obtain a system for $B_0^+$, $B_0^-$:
+
+
+\begin{align}
+    \label{eq:B0_system_p}
+    B_0^+\Big(\frac{k_2^+}{\sigma^+} + 1 +(T-1)\frac{\sigma^+}{\ol{\sigma}}\Big)  + B_0^-(T-1)\frac{\sigma^-}{\ol{\sigma}}
+    &= P_2^+ - \ol{P}_2 +  (\ol{P}_2 - P_1) T, \\
+%   
+    \label{eq:B0_system_m}
+    B_0^-\Big(\frac{k_2^-}{\sigma^-} + 1 +(T-1)\frac{\sigma^-}{\ol{\sigma}}\Big)  + B_0^-(T-1)\frac{\sigma^+}{\ol{\sigma}}
+    &= P_2^- - \ol{P}_2 +  (\ol{P}_2 - P_1) T, 
+\end{align}
+denoting
+\[
+    T  = \frac{\ol{k}\sinh( 1/\ol{k} )}{\cosh(1/\ol{k}) - U}.
+\]
+The system matrix is strictly diagonally dominant as long as 
+\[
+    \frac{k_2^{+/-}}{\sigma^{+/-}} + 1 > 1 > T -1.
+\]
+Since $a_n^{+/-}$ are negative so are $u_n$ and $U$. Then
+\[
+    T < \ol{k}\, {\rm tanh}( 1/\ol{k} ) < 1
+\]
+and the system matrix is always strictly diagonally dominant.
+
+Evaluation of the solution is performed in following steps:
+\begin{enumerate}
+    \item Determine number of terms $N$ in the series.
+    \item Solve systems \eqref{eq:an_system} to obtain $a_n^+$, $a_n^-$ for $n=1,\dots, N$.
+    \item Compute $u_n$ and the sum $U$.
+    \item Solve system $(\ref{eq:B0_system_p} - \ref{eq:B0_system_m})$ for $B_0^+$, $B_0^-$.
+    \item Compute $u_0$.
+    \item Evaluate $p_1$ or $p_2^+$, $p_2^-$ by partial sumation of series \eqref{eq:barrier_p1_series},
+          \eqref{eq:p2_series_p}, \eqref{eq:p2_series_m}, respectively.
+\end{enumerate}
+
+
+\section{Evaluation of series}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsubsection{Výsledné vztahy pro výpoèet tlaku}
+
+Nyní ji mùeme vyjádøit vztahy pro výpoèet tlaku v øeené oblasti. Pro výpoèet tlaku na puklinì pouijeme rovnici (\ref{r_34})
+
+\begin{equation}
+\nonumber
+p_1(x) = \left(P_1 - \tilde{P}_2 + \tilde{B}_0 + \sum\limits_{n=1}^{\infty} \tilde{u}_n \right) \frac{\cosh(K(1 - x))}{\cosh K} + \tilde{P}_2 - \tilde{B}_0 - \sum\limits_{n=1}^{\infty} \tilde{u}_n \cos(n \pi x)
+\end{equation}
+
+\noindent
+do které za $\tilde{u}_n$ dosadíme
+
+\begin{equation}
+\nonumber
+\tilde{u}_n = \frac{\tilde{\omega} \left( 1 - e^{-2n\pi} \right) \left( \alpha^+ \sigma^+ + \alpha^- \sigma^- \right)}{2 \left( n^2 \pi^2 k_1 + \tilde{\sigma} \right)^2}
+\end{equation}
+
+\noindent
+Pro výpoèet tlaku v okolním prostøedí pouijeme rovnice (\ref{r_18}) a (\ref{r_19}), do kterých dosadíme (\ref{r_49}) a (\ref{r_50}). Z dùvodu pøesnìjího výpoètu pøi implementaci vztahù do Matlabu a Pythonu nahradíme hyperbilickou funkci exponenciální. Tedy $\sinh(n\pi) = \frac{1}{2} \left( e^{n\pi} - e^{-n\pi} \right)$. Po dalích úpravách pøi kterých ze vztahu eliminujeme $e^{n\pi}$ dostaneme
+
+\begin{equation}
+\nonumber
+p_2^+(x,y) = P_2^+ - B_0^+ + B_0^+y - \sum\limits_{n=1}^{\infty} \frac{\alpha^+ \tilde{\omega} }{2 \left( n^2 \pi^2 k_1 + \tilde{\sigma} \right)} \left( e^{-n\pi y} - e^{-n\pi(2-y)} \right) \cos(n\pi x )
+\end{equation}
+
+\begin{equation}
+\nonumber
+p_2^-(x,y) = P_2^- - B_0^- + B_0^-y - \sum\limits_{n=1}^{\infty} \frac{\alpha^- \tilde{\omega} }{2 \left( n^2 \pi^2 k_1 + \tilde{\sigma} \right)} \left( e^{-n\pi y} - e^{-n\pi(2-y)} \right) \cos(n\pi x )
+\end{equation}
+
+\noindent
+Máme ji vyjádøeny i vztahy pro výpoèet vech koeficientù, které je tøeba vypoèítat a následnì dosadit do koneèných vztahù pro výpoèet tlakù. Tyto koeficienty mùeme rozdìlit na dvì skupiny. Ty, které nejsou závislé na souøadnicích ani na promìnné $n$, pouívané ve výpoètech souètù. Konkrétnì to jsou $B_0^+$, $B_0^-$, $\tilde{B}_0$ a  $\tilde{\omega}$. Vechny dostaneme ze soustavy rovnic (\ref{r_51}) - (\ref{r_54}) a jeliko se jedná o konstanty, staèí je vypoèítat pouze jednou. Dále pak máme koeficienty, které pouíváme ve výpoètech sum a jsou tedy závislé na promìnné $n$. Sem patøí $\tilde{u}_n$, $\alpha^+$ a $\alpha^-$. I ty si mùeme pøedpoèítat a jejich hodnoty pro rùzná $n$ uloit do pole. K jejich výpoètu pouijeme soustavu rovnic (\ref{r_45}) a (\ref{r_48}). K výpoètu $\tilde{u}_n$ pouijeme výe uvedený vztah.
+
+Konkrétní hodnotu tlaku v libovolném místì pukliny získáme dosazením poadované souøadnice $x$ do rovnice pro $p_1(x)$. Tlak v libovolném místì 2D oblasti získáme dosazením souøadnic $x$ a $y$ do rovnic $p_2^+(x,y)$ pro èást nad puklinou nebo do rovnice $p_2^-(x,y)$ pro èást oblasti pod puklinou.
+
+\end{document}
