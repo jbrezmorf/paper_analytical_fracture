@@ -124,13 +124,12 @@ We set:
   \label{eq:c_coupling_a}
   p_2^+ &= p_2^-                &&\text{ on }\Omega_1,\\
   -k_2 (-\prtl_y p_2^+ + \prtl_y p_2^-) &= f(x)         &&\text{ on }\Omega_1,\\
-  f(x) &= \sigma (p_2(x,0) - p_1(x)),   &&
+  f(x) &= 2\sigma (p_2(x,0) - p_1(x)),   &&
   \label{eq:c_coupling_c}
 \end{align}
 where $\sigma$ is a coupling parameter, usually $\sigma \approx k_1 / \delta$ with $\delta$ standing for the fracture cross-section. 
 Solution of this case is discussed in Section \ref{sec:continuous_frac}.
 
-\todo{Uvazovat misto $\sigma$ $2\sigma$ kvuli ekvivalenci s barierovym modelem. Poznamka, ze pro velka $\sigma$ je spojity model limita barieroveho modelu }    
 
 
 {\bf Barrier fracture.} Other case is a fracture with significantly smaller conductivity compared to the surrounding continuum. In this case
@@ -158,9 +157,8 @@ Solution to this system is discussed in Section \ref{sec:barrier_frac}.
 We shall derive an analytical solution to the system $(\ref{eq:Darcy_common} - \ref{eq:bc_1})$ with the coupling conditions 
 $(\ref{eq:c_coupling_a} - \ref{eq:c_coupling_c})$. Symmetry of the problem in 
 both $x$ and $y$ direction allows us to solve equivalent reduced problem on $\widetilde\Omega_2=(0,1)\times(0,1)$ and  
-$\widetilde\Omega_1$. Moreover we flip the reduced domain in the $x$ direction setting the Dirichlet  condition on the fracture for $x=0$
-and the homegoenous Neumann condition at $x=1$ to impose the symmetry. This transformation slightly simplify certain formulas.
-All equations are preserved with exception of the half flux on the fracture. The equivalent system  reads:
+$\widetilde\Omega_1$. We impose the symmetry in $x$ direction by homegoenous Neumann condition at $x=0$. 
+All equations are preserved with exception of the half flux on $\Gamma^+$. The equivalent system  reads:
 \begin{align}
     \label{eq:cc_darcy_2d}
     -k_2 \Laplace p_2(x,y) &= 0         &&\text{on }\widetilde\Omega_2 \\
@@ -183,7 +181,7 @@ for  $x\in (0,1)$,
 for $y \in (0, 1)$ and finally
 \begin{equation}
     \label{eq:cc_bc_1}
-    p_1'(1) = 0, \quad  p_1(0) = P_1. 
+    p_1'(0) = 0, \quad  p_1(1) = P_1. 
 \end{equation}
 
 \begin{prop}
@@ -196,18 +194,8 @@ can be expressed in from of Fourier series:
 %
 \begin{equation}
     \label{eq:p2_series}
-    p_1(x) = P_2-B_0 -u_0 \cosh(x/k) -2B_0 \sum_{n=1}^\infty  u_n \cos(\pi n x) 
+    p_1(x) = P_2-B_0 +u_0 \cosh(x/k) -2B_0 \sum_{n=1}^\infty  u_n \cos(\pi n x) 
 \end{equation}
-
-Computing $p_1(1)$:
-\[
-    P_2
-    - \frac{P_2 - P_1}{1 + 2  U + \frac{k_2}{\sigma k} \frac{\cosh(1/k)}{\sinh(1/k)}}  \left(
-        1
-        +\frac{k_2 }{\sigma k\sinh(1/k)} \cosh(1/k) 
-        +2 \sum_{n=1}^\infty  u_n \cos(\pi n) 
-      \right)
-\]
 
 where we denote:
 \[
@@ -217,7 +205,7 @@ and use following coefficients:
 
 \begin{equation}
     \label{eq:an}
-    a_n = \frac{k_2}{ k_2 \pi n \cosh(\pi n) \big(1 + (k n \pi)^2\big) 
+    a_n = \frac{(-1)^n k_2}{ k_2 \pi n \cosh(\pi n) \big(1 + (k n \pi)^2\big) 
     + \sigma (k n \pi)^2 \sinh(\pi n)} \ , 
 \end{equation}
 
@@ -241,7 +229,7 @@ and constants:
 \end{equation}
 \begin{equation}
     \label{eq:U}
-    U =  \sum_{n=1}^{\infty} u_n.
+    U =  \sum_{n=1}^{\infty} (-1)^n u_n.
 \end{equation}
 
 \end{prop}
@@ -326,17 +314,17 @@ Using linearity of the equation we obtain the general form of $p_1$ as:
 \end {equation}
 with $u_n$ given by \eqref{eq:un}. Then the boundary conditions \eqref{eq:cc_bc_1} yield:
 \begin{align*}
-P_1 &= p_1(0) = c^+ + c^- + P_2 - B_0 - 2 B_0 U, \\
-0 &= p_1'(1) = \frac{1}{k}(c^+e^{1/k} - c^- e^{-1/k}) 
+P_1 &= p_1(1) = c^+e^{1/k} + c^- e^{-1/k} + P_2 - B_0 - 2 B_0 U, \\
+0 &= p_1'(0) = \frac{1}{k}(c^+ - c^-) 
 \end{align*}
 with $U$ given by \eqref{eq:U}. Solving for $c^+$ and $c^-$ we get:
 \[
-  c^{+/-} = \frac{P_1 - P_2 + B_0(1 + 2 U}{2\cosh(1/k)} e^{-/+\frac{1}{k}}.
+  c^+ = c^- = \frac{P_1 - P_2 + B_0(1 + 2 U)}{2\cosh(1/k)}.
 \]
 Then \eqref{eq:p1_series} gives 
 \begin{equation}
     \label{eq:p1_series_tmp}
-    p_1(x) = P_2 -  B_0 + u_0 \cosh((1-x)/k) - 2B_0 \sum_{n=1}^\infty  u_n \cos(\pi n x) 
+    p_1(x) = P_2 -  B_0 + u_0 \cosh(x/k) - 2B_0 \sum_{n=1}^\infty  u_n \cos(\pi n x) 
 \end{equation}
 which is \eqref{eq:p1_series} but with 
 \begin{equation}
@@ -352,15 +340,15 @@ which is \eqref{eq:p1_series} but with
 Last relation that we have to consider is the boundary condition $(\ref{eq:cc_bc_x}b)$. To this end we plug in the relations \eqref{eq:p2_series}, 
 \eqref{eq:p1_series_tmp} for $p_2$, $p_1$  and we group the terms for remaining unknowns on the left hand side. After straight forward
 manipulation we obtain:
-% \[
-%     \frac{B_0 k_2}{\sigma} + 2 B_0 \sum_{n=1}^\infty 
-%         \Big[ \frac{k_2}{\sigma} n\pi  \cosh(\pi n) 
-%         + \sinh(\pi n)
-%         - \frac{\sinh(n \pi)}{1 + (k n \pi)^2} 
-%         \Big] a_n
-%         \cos(\pi n x)        
-%        = - u_0 \cosh(x/k) 
-% \]
+ \[
+     \frac{B_0 k_2}{\sigma} + 2 B_0 \sum_{n=1}^\infty 
+         \Big[ \frac{k_2}{\sigma} n\pi  \cosh(\pi n) 
+         + \sinh(\pi n)
+         - \frac{\sinh(n \pi)}{1 + (k n \pi)^2} 
+         \Big] a_n
+         \cos(\pi n x)        
+        = - u_0 \cosh(x/k) 
+ \]
 
 
 
@@ -395,12 +383,21 @@ which compared to \eqref{eq:fourier_A0} gives us \eqref{eq:u0}.
 For other terms, we integrate by parts to get:
 \[
 {\cal A}_n = -2 u_0\int _0^1 \cosh(x/k) \cos (n\pi x) dx 
-= -\frac{2u_0 k}{1+(k n \pi)^2}\sinh(1/k).
+= -\frac{(-1)^n 2u_0 k}{1+(k n \pi)^2}\sinh(1/k).
 \]
-We plug \eqref{eq:b0} into \eqref{eq:fourier_An} and compare it with just computed integral to obtain
-formula \eqref{eq:an} for coeeficients $a_n$.
+
+%\[
+% k_2   = \Bigl[ ({1+(k n \pi)^2}) k_2 n\pi \cosh(n\pi) + \sigma(k n \pi)^2\sinh(n \pi) \Bigr]a_n
+%\]
+
+We plug \eqref{eq:u0} into the result and compare it with \eqref{eq:fourier_An} to obtain
+formula \eqref{eq:an} for coeficients $a_n$.
 The only remaining unknown is $B_0$ which we determine by comparing \eqref{eq:u0_def} and \eqref{eq:u0}.
 Straight forwared calculation leads to \eqref{eq:b0}.
+
+\subsection{Evaluation of the solution}
+Formulas in Theorem \ref{thm:continuous} are not suitable for practical calculations since hypergeometric functions are evaluated for large $n$.
+To remadiate this issue we 
 
 
 \section{Barrier fracture}

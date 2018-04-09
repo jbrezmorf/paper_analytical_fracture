@@ -2,7 +2,14 @@ import numpy as np
 import numpy.linalg as la
 import scipy.sparse as sparse
 import scipy.sparse.linalg as sp_la
+import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib import rc
+rc('text', usetex=True)
+rc('font', family='serif')
+## for Palatino and other serif fonts use:
+#rc('font',**{'family':'serif','serif':['Palatino']})
+
 
 from matplotlib import cm
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
@@ -51,28 +58,44 @@ class ContinousFracture:
         ###
         self.precompute_analytical()
 
+    # def sinh(self, x):
+    #     return 1 - np.exp( -2.0 * x)
+    #     #return np.sinh(x)
+    #
+    # def cosh(self, x):
+    #     return 1 + np.exp( -2.0 * x)
+    #     #return np.cosh(x)
+
     def precompute_analytical(self):
         self.k = np.sqrt(self.k1 / 2.0 / self.sigma)
 
-        nn = self.n_series = np.arange(1, self.n_terms, 1.0)
+        n_err_terms = int(0.2*self.n_terms)
+        n_terms = self.n_terms + n_err_terms
+        nn = self.n_series = np.arange(1, n_terms, 1.0)
         k_pi = self.k * np.pi
         k_n_pi_sqr = (k_pi * self.n_series) ** 2
         m2_pi = -2.0 * np.pi
         exp_pi_m2_n = np.exp(m2_pi * nn)
-        self.sinh_pi_n = 0.5 * (1.0 - exp_pi_m2_n)
-        self.cosh_pi_n = 0.5 * (1.0 + exp_pi_m2_n)
+        self.sinh_pi_n = (1.0 - exp_pi_m2_n)
+        self.cosh_pi_n = (1.0 + exp_pi_m2_n)
         an_denom = self.k2 * np.pi * nn * self.cosh_pi_n \
-                   * (1.0 + k_n_pi_sqr) \
-                   + self.sigma * k_n_pi_sqr * self.sinh_pi_n
+                    * (1.0 + k_n_pi_sqr) \
+                    + self.sigma * k_n_pi_sqr * self.sinh_pi_n
+        #an_denom = self.k2 * np.pi * nn * self.cosh(nn *np.pi) \
+        #           * (1.0 + k_n_pi_sqr) \
+        #           + self.sigma * k_n_pi_sqr * self.sinh(nn*np.pi)
 
-        alternate = np.empty((self.n_terms-1,), float)
+        alternate = np.empty((n_terms-1,), float)
         alternate[::2] = -1      # 0 is n=1, thus odd
         alternate[1::2] = +1
 
         self.an = alternate * self.k2 / an_denom
         self.un = self.an * self.sinh_pi_n / (1.0 + k_n_pi_sqr)
+        #self.un = self.an * self.sinh(np.pi*nn) / (1.0 + k_n_pi_sqr)
 
-        u_sum = np.sum(alternate * self.un)
+        u_sum = np.sum( (alternate * self.un)[:self.n_terms] )
+        u_sum_err = np.sum( (alternate * self.un)[self.n_terms:] )
+
         self.B0 = (self.P2 - self.P1) / ( \
                     1.0 + 2 * u_sum \
                     + self.k2 * np.cosh(1.0 / self.k) \
@@ -80,7 +103,10 @@ class ContinousFracture:
             )
         self.u0 = -self.k2 * self.B0 / (self.sigma * self.k * np.sinh(1.0 / self.k))
         alt_u0 = (self.P1 -self.P2 + self.B0*(1+2*u_sum)) / np.cosh(1.0 / self.k)
-        print("u_sum: ", u_sum)
+
+        an_err = np.sum(self.an[self.n_terms:] )
+
+        print("un_err: ", u_sum_err, "an_err:", an_err)
         print("u0:", self.u0)
         print("alt_u0:", alt_u0)
         assert np.isclose(self.u0, alt_u0)
@@ -95,7 +121,11 @@ class ContinousFracture:
         pi_1y_m2 = -2 * np.pi * (1 - y)
 
         series_sum = np.sum(self.an * np.cos(pi_x * self.n_series)
-                            * 0.5 * (1.0 - np.exp(pi_1y_m2 * self.n_series)))
+                            * (np.exp( (-y * np.pi) * self.n_series ) - np.exp( ((y-2.0)*np.pi) * self.n_series ) ) )
+
+
+        #terms = self.an * np.cos(pi_x * self.n_series)*self.sinh(np.pi * (1 - y) * self.n_series)
+        #series_sum = np.sum(terms)
         p2_sum = self.P2 + self.B0 * (y - 1) - 2 * self.B0 * series_sum
         return p2_sum
 
@@ -130,7 +160,7 @@ class ContinousFracture:
         #k1 = self.k1
         #sigma = self.sigma
 
-        nx = int(nx/2)
+        nx = int(nx/2)       # we compute only half of domain
         ny += int(ny % 2)    # Make ir even
 
 
@@ -313,10 +343,10 @@ class BurdaFrac(ContinousFracture):
 
 
 def plot_test():
-    ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=10000)
+    ac = ContinousFracture(k1=0.1, k2=1, sigma=1, P1=5, P2=10, n_terms=3)
 
-    #ac = BurdaFrac(k1=10, k2=10, sigma=200, P1=5, P2=10, n_terms=10000)
-    nx,  ny = 200, 200
+    #ac = BurdaFrac(k1=0.1, k2=1, sigma=3, P1=5, P2=10, n_terms=10000)
+    nx,  ny = 100, 100
     x, y, p1, p2 = ac.solve_fd(nx, ny)
 
     fig = plt.figure(figsize=(15, 5))
@@ -324,16 +354,24 @@ def plot_test():
     ax_err = fig.add_subplot(122)
 
     ax.plot(x, p1, '.', label="p1fd")
-    p2_y0 = p2[int(ny/2), :]
-    ax.plot(x, p2_y0, '.', label="p2fd, y=0")
     ac_p1 = ac.plot_p1(ax, x)
-    ac_p2 = ac.plot_p2(ax, x, 0)
-    y = (ac.P1 - ac.P2) * np.cosh( x/ac.k1) / np.cosh(1/ac.k1) + ac.P2
+    ax_err.plot(x, p1 - ac_p1, label="p1-a_p1")
+
+    y_cuts = [0, 0.2, 0.5, 0.8, 1]
+    for y in y_cuts:
+        iy = int(y*ny/2)
+        y_true = 2.0/ny * iy
+        iy = int(ny/2) - iy
+        p2_ycut = p2[iy, :]
+        ax.plot(x, p2_ycut, '.', label="p2fd, y={}".format(y_true))
+        ac_p2 = ac.plot_p2(ax, x, y_true)
+
+        ax_err.plot(x, p2_ycut - ac_p2, label="p2-a_p2, y={}".format(y))
+
+    #y = (ac.P1 - ac.P2) * np.cosh( x/ac.k1) / np.cosh(1/ac.k1) + ac.P2
     #ax.plot(x, y, label="ref")
 
-    ax_err.plot(x, p1 - ac_p1, label="p1-a_p1")
-    ax_err.plot(x, p2_y0- ac_p2, label="p2-a_p2")
-    ax_err.legend()
+    ax_err.legend(bbox_to_anchor=(1.05, 1), loc=0, borderaxespad=0.)
 
     #stripes=[0.0001, 0.00033, 0.001, 0.0033, 0.01, 0.033, 0.1, 0.33, 1]
     #ac.plot_analytical()
@@ -357,23 +395,43 @@ def plot_test():
     ax.legend(bbox_to_anchor=(-.05, 1), loc=0, borderaxespad=0.)
     plt.show()
 
+    # compute approx of -k2*\Lapl p_2 for analytical sol.
+
+    fig = plt.figure()
+    #ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111)
+
+    grid = np.linspace(0,1,20)
+    X, Y = np.meshgrid(grid, grid)
+    Z = np.empty_like(X)
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            x = X[i,j]
+            y = Y[i, j]
+            d = 1e-7
+            p2_11 = ac.vec_eval_p2(x,y)
+            p2_21 = ac.vec_eval_p2(x + d, y)
+            p2_01 = ac.vec_eval_p2(x - d, y)
+            p2_12 = ac.vec_eval_p2(x, y + d)
+            p2_10 = ac.vec_eval_p2(x, y - d)
+
+            Z[i,j] = (4* p2_11 - p2_21 - p2_01 - p2_10 - p2_12) / d /d
+    #ax.plot_wireframe(X, Y, p2, rstride=10, cstride=10)
+    print(Z)
+    surf = ax.contourf(X, Y, Z, cmap=cm.coolwarm,
+                           linewidth=0, antialiased=False)
 
 
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-    #
-    # X, Y = np.meshgrid(x, y)
-    # #ax.plot_wireframe(X, Y, p2, rstride=10, cstride=10)
-    # surf = ax.plot_surface(X, Y, p2, cmap=cm.coolwarm,
-    #                        linewidth=0, antialiased=False)
-    #
-    # ax.zaxis.set_major_locator(LinearLocator(10))
-    # ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
-    #
-    # # Add a color bar which maps values to colors.
-    # fig.colorbar(surf, shrink=0.5, aspect=5)
-    #
-    # plt.show()
+
+    #ax.zaxis.set_major_locator(LinearLocator(10))
+    #ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
+
+    # Add a color bar which maps values to colors.
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+
+    plt.show()
+
+
 
 def plot_p2_field(x, y, p2_diff):
     fig = plt.figure(figsize=(15, 5))
@@ -386,11 +444,13 @@ def plot_p2_field(x, y, p2_diff):
     # Add the contour line levels to the colorbar
     #cbar.add_lines(CS2)
 
-    nx = len(x)
-    ax2.plot(y, p2_diff[:, int(nx/2)], label='center')
-    ax2.plot(y, p2_diff[:, 1], label='0.01')
-    ax2.plot(y, p2_diff[:, -2], label='0.99')
-    ax2.legend()
+    # nx = len(x)
+    # ax2.plot(y, p2_diff[:, int(nx/2)], label='center')
+    # ax2.plot(y, p2_diff[:, 1], label='0.01')
+    # ax2.plot(y, p2_diff[:, -2], label='0.99')
+    # ax2.legend()
+    return (ax1, ax2)
+
     plt.show()
 
 
@@ -400,7 +460,7 @@ def compute_error(n_terms, fd_n, k1, sigma, y_band=True):
     x, y, p1, p2 = ac.solve_fd(nx, ny)
 
     p1_diff = ac.vec_eval_p1(x) -p1
-    p1_l2 = la.norm( p1_diff**2 ) * np.sqrt(2.0 / nx)
+    p1_l2 = la.norm( p1_diff) * np.sqrt(2.0 / nx)
 
     if y_band:
         band = np.arange(int(ny/2*0.9), int(ny/2*1.1), 1)
@@ -410,41 +470,121 @@ def compute_error(n_terms, fd_n, k1, sigma, y_band=True):
     an_p2_band = ac.vec_eval_p2(x[None, :], y[band, None])
     p2_diff = an_p2_band - p2[band, :]
 
-    p2_l2 = la.norm(p2_diff.ravel() ** 2) * np.sqrt(2.0/ nx * 2.0/ ny)
-    plot_p2_field(x,y, p2_diff)
+    p2_l2 = la.norm(p2_diff.ravel()) * np.sqrt(2.0/ nx * 2.0/ ny)
+
+    return p1_l2, p2_l2
+
+    # fig = plt.figure(figsize=(15, 5))
+    # ax1 = fig.add_subplot(121)
+    # ax2 = fig.add_subplot(122)
+    #
+    # # p2 BC condtion for Analytical solution on X axis
+    # # p2_dy = np.empty_like(x)
+    # # p12_diff = np.empty_like(x)
+    # # for i, xv in enumerate(x):
+    # #     d = 1e-6
+    # #     p20 = ac.vec_eval_p2(xv, 0)
+    # #     p2d = ac.vec_eval_p2(xv, d)
+    # #     p2_dy[i] = ac.k2*(p2d - p20) / d
+    # #     p12_diff[i] = ac.sigma*(p20 - ac.vec_eval_p1(xv))
+    # # ax1.plot(x, p2_dy, label = "dp2/dy(x,0)")
+    # # ax1.plot(x, p12_diff, label = "diff")
+    # # ax1.legend()
+    #
+    # # p2 error countour plot
+    # CS = ax1.contourf(x, y, p2_diff)
+    # cbar = plt.colorbar(CS)
+    # cbar.ax.set_ylabel('diff')
+    #
+    # # Error lines for constant x
+    # ax2.plot(y, p2_diff[:, int(nx/2)], label='center')
+    # ax2.plot(y, p2_diff[:, 1], label='0.01')
+    # ax2.plot(y, p2_diff[:, -2], label='0.99')
+    # ax2.legend()
+    #
+    #
+    # # Analytical and FD solution lines for constant X
+    # # ax2.plot(y, an_p2_band[:, int(nx/2)], label='an, x=0')
+    # # ax2.plot(y, an_p2_band[:, 1], label='an, x=0.01')
+    # # ax2.plot(y, an_p2_band[:, -2], label='an, x=0.99')
+    # #
+    # # ax2.plot(y, p2[:, int(nx/2)], label='fd, x=0')
+    # # ax2.plot(y, p2[:, 1], label='fd, x=0.01')
+    # # ax2.plot(y, p2[:, -2], label='fd, x=0.99')
+
+
+
+
+    ax2.legend()
+    plt.show()
+
+
     return (p1_l2, p2_l2, p1_diff, p2_diff)
 
 
 def plot_decay(table, n_an, n_fd):
-    fig = plt.figure(figsize=(15, 5))
-    ax_an1 = fig.add_subplot(221)
-    ax_fd1 = fig.add_subplot(222)
+    fig = plt.figure(figsize=(12, 8))
+
     ax_an2 = fig.add_subplot(223)
-    ax_fd2 = fig.add_subplot(224)
+    ax_an1 = fig.add_subplot(221, sharex=ax_an2)
+    ax_fd2 = fig.add_subplot(224, sharey=ax_an2)
+    ax_fd1 = fig.add_subplot(222, sharex=ax_fd2, sharey=ax_an1)
+
+
+    p1_cmap = matplotlib.cm.get_cmap('Blues')
+    p2_cmap = matplotlib.cm.get_cmap('Reds')
+    fd_norm = matplotlib.colors.LogNorm(vmin=min(n_fd)/10, vmax=max(n_fd))
+    an_norm = matplotlib.colors.LogNorm(vmin=min(n_an)/10, vmax=max(n_an))
 
     for i, nfd in enumerate(n_fd):
-        ax_an1.loglog(n_an, table[:, i, 0], 'r-', label="p1d, nfd: {}".format(nfd))
-        ax_an2.loglog(n_an, table[:, i, 1], 'b-', label="p2d, nfd: {}".format(nfd))
+        ax_an1.loglog(n_an, table[:, i, 0], color=p1_cmap(fd_norm(nfd)) , label="p1, $N_f$: {}".format(nfd))
+        ax_an2.loglog(n_an, table[:, i, 1], color=p2_cmap(fd_norm(nfd)) , label="p2, $N_f$: {}".format(nfd))
+    #ax_an1.loglog(n_an, np.array(n_an) ** (-2.0), color = 'orange', label="$N^{-2}$")
+    #ax_an2.loglog(n_an, np.array(n_an) ** (-2.0), color='orange', label="$N^{-2}$")
+    #ax_an1.set_xticklabels(n_an)
+    #ax_an2.set_xticks(n_an)
+    #ax_an1.set_xlabel("Analytical solution. \# of terms to sum $[N_a]$")
+    plt.setp(ax_an1.get_xticklabels(), visible=False)
+    ax_an2.set_xlabel("Analytical solution. \# of terms to sum $[N_a]$")
+    ax_an1.set_ylabel("$p_1$, approx. of $L^2$ error.")
+    ax_an2.set_ylabel("$p_2$, approx. of $L^2$ error.")
+    ax_an1.legend(loc=1)
+    ax_an2.legend(loc=1)
 
     for i, nan in enumerate(n_an):
-        ax_fd1.loglog(n_fd, table[i, :, 0], 'r-', label="p1d, nan: {}".format(nan))
-        ax_fd2.loglog(n_fd, table[i, :, 1], 'b-', label="p2d, nan: {}".format(nan))
-
-
-    ax_an1.legend()
-    ax_fd1.legend()
-    ax_an2.legend()
-    ax_fd2.legend()
+        ax_fd1.loglog(n_fd, table[i, :, 0], color=p1_cmap(an_norm(nan)), label="p1, $N_a$: {}".format(nan))
+        ax_fd2.loglog(n_fd, table[i, :, 1], color=p2_cmap(an_norm(nan)), label="p2, $N_a$: {}".format(nan))
+    ax_fd1.loglog(n_fd, 1e2*np.array(n_fd) ** (-2.0), color = 'orange', label="ref. $N^{-2}$")
+    ax_fd2.loglog(n_fd, 1e2*np.array(n_fd) ** (-2.0), color='orange', label="ref. $N^{-2}$")
+    ax_fd1.set_ylim( 0.8*np.min(table[:, :, 0].ravel()), 1.2*np.max(table[:, :, 0].ravel()) )
+    ax_fd2.set_ylim( 0.8*np.min(table[:, :, 1].ravel()), 1.2*np.max(table[:, :, 1].ravel()) )
+    #ax_fd1.set_xticks(n_fd)
+    #ax_fd2.set_xticks(n_fd)
+    #ax_fd1.set_xlabel("Finite diferences. \# of points on one side $[N_f]$.")
+    ax_fd2.set_xlabel("Finite diferences. \# of points on one side $[N_f]$.")
+    #ax_fd1.set_ylabel("Approx. of $|| p_f - p_a ||_{L_2}$.")
+    #ax_fd2.set_ylabel("Approx. of $|| p_f - p_a ||_{L_2}$.")
+    plt.setp(ax_fd1.get_xticklabels(), visible=False)
+    ax_fd1.legend(loc=3)
+    ax_fd2.legend(loc=3)
+    plt.savefig("continuous_convergency.pdf")
     plt.show()
 
 
-def error_decay():
-    k1=10
-    sigma = 10
+
+def error_decay(plot = False):
+    """
+    Compute and plot L2 errors of p1 and p2 as functions of
+    number of summed terms in the series and number of FD points.
+    Using fixed problem parameters.
+    :return:
+    """
+    k1=0.1
+    sigma = 1
 
     # n_terms_list =  [10, 100, 1000, 10000]
     # nx_list = [10, 20, 40, 80, 160, 320]
-    n_terms_list =  [10, 100, 1000]
+    n_terms_list =  [10, 50, 100, 200, 500]
     nx_list = [20, 40, 80, 160, 320, 640, 1280]
 
 
@@ -457,6 +597,8 @@ def error_decay():
 
 
 
-p1_l2, p2_l2, p1_diff, p2_diff = compute_error(1000, 320, 10, 10, y_band=False)
+#p1_l2, p2_l2, p1_diff, p2_diff = compute_error(100, 100, 0.01, 1, y_band=False)
 
-#error_decay()
+error_decay()
+
+#plot_test()
