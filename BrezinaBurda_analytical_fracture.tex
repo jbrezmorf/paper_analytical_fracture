@@ -5,6 +5,7 @@
 \usepackage{amssymb}
 \usepackage{stmaryrd}
 \usepackage{color}
+\usepackage{graphicx}
 
 \newtheorem{prop}{Proposition}
 
@@ -184,7 +185,9 @@ for $y \in (0, 1)$ and finally
     p_1'(0) = 0, \quad  p_1(1) = P_1. 
 \end{equation}
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PROPOSITION 1
 \begin{prop}
+\label{proposition_continuous}
 The solution $p_1(x)$ and $p_2(x,y)$ to the system $(\ref{eq:cc_darcy_2d} - \ref{eq:cc_bc_1})$
 can be expressed in from of Fourier series:
 \begin{equation}
@@ -334,21 +337,21 @@ which is \eqref{eq:p1_series} but with
 
 
 
-\subsection{Resolving the coupling}
+\subsection{Fracture coupling}
 \label{sec:cont_coupling}
 
 Last relation that we have to consider is the boundary condition $(\ref{eq:cc_bc_x}b)$. To this end we plug in the relations \eqref{eq:p2_series}, 
 \eqref{eq:p1_series_tmp} for $p_2$, $p_1$  and we group the terms for remaining unknowns on the left hand side. After straight forward
 manipulation we obtain:
- \[
-     \frac{B_0 k_2}{\sigma} + 2 B_0 \sum_{n=1}^\infty 
-         \Big[ \frac{k_2}{\sigma} n\pi  \cosh(\pi n) 
-         + \sinh(\pi n)
-         - \frac{\sinh(n \pi)}{1 + (k n \pi)^2} 
-         \Big] a_n
-         \cos(\pi n x)        
-        = - u_0 \cosh(x/k) 
- \]
+%  \[
+%      \frac{B_0 k_2}{\sigma} + 2 B_0 \sum_{n=1}^\infty 
+%          \Big[ \frac{k_2}{\sigma} n\pi  \cosh(\pi n) 
+%          + \sinh(\pi n)
+%          - \frac{\sinh(n \pi)}{1 + (k n \pi)^2} 
+%          \Big] a_n
+%          \cos(\pi n x)        
+%         = - u_0 \cosh(x/k) 
+%  \]
 
 
 
@@ -373,18 +376,21 @@ for $n=1, \dots$. The left hand side of \eqref{eq:fourier_coupling} is the Fouri
 remaining unknowns $B_0$, $A_n$ by computing Fourier of the function on the right hand side and comparing coefficients.
 
 For the zero term we have:
-\[
-{\cal A}_0 = -2 u_0 \int _0^1 \cosh(x/k) dx =
-- 2 u_0 k\sinh 1/k.
-\]
+\begin{equation}
+    \label{eq:compute_A0}
+    {\cal A}_0 = -2 u_0 \int _0^1 \cosh(x/k) dx =
+    - 2 u_0 k\sinh(1/k).
+\end{equation}
+
 which compared to \eqref{eq:fourier_A0} gives us \eqref{eq:u0}.
 
 
 For other terms, we integrate by parts to get:
-\[
-{\cal A}_n = -2 u_0\int _0^1 \cosh(x/k) \cos (n\pi x) dx 
-= -\frac{(-1)^n 2u_0 k}{1+(k n \pi)^2}\sinh(1/k).
-\]
+\begin{equation}
+    \label{eq:compute_An}
+    {\cal A}_n = -2 u_0\int _0^1 \cosh(x/k) \cos (n\pi x) dx 
+    = -\frac{(-1)^n 2u_0 k}{1+(k n \pi)^2}\sinh(1/k).
+\end{equation}
 
 %\[
 % k_2   = \Bigl[ ({1+(k n \pi)^2}) k_2 n\pi \cosh(n\pi) + \sigma(k n \pi)^2\sinh(n \pi) \Bigr]a_n
@@ -395,15 +401,62 @@ formula \eqref{eq:an} for coeficients $a_n$.
 The only remaining unknown is $B_0$ which we determine by comparing \eqref{eq:u0_def} and \eqref{eq:u0}.
 Straight forwared calculation leads to \eqref{eq:b0}.
 
-\subsection{Evaluation of the solution}
-Formulas in Theorem \ref{thm:continuous} are not suitable for practical calculations since hypergeometric functions are evaluated for large $n$.
-To remadiate this issue we 
+\subsection{Evaluation procedure}
+Formulas in Proposition \ref{proposition_continuous} are not suitable for practical calculations since hypergeometric functions are evaluated for large $n$.
+To remediate this issue we factor out and cancel $e^{\pi n}$. Actual evaluation then takes  following procedure:
+
+\begin{enumerate}
+    \item Set finite $N$ for truncated series. 
+    \item Compute $\tilde a_n$ for $n = 1, \dots, N$ using:
+    \[
+        \tilde a_n = \frac{(-1)^n k_2}{ k_2 \pi n (1 - e^{-2\pi n}) \big(1 + (k n \pi)^2\big) 
+            + \sigma (k n \pi)^2 (1 + e^{-2\pi n})} \ , 
+    \]
+    \item Compute related $\tilde u_n$ coefficients:
+    \[
+        \tilde u_n = \frac{\tilde a_n (1 - e^{-2\pi n})}{1 + (k n \pi)^2}, 
+    \]
+    \item Evaluate truncated sum:
+    \[
+        U =  \sum_{n=1}^{N} (-1)^n u_n.
+    \]
+    \item Compute remaining parameters $u_0$, $B_0$ using \eqref{eq:u0}, \eqref{eq:b0}.
+    \item Evaluate $p_2$ for any given point $(x,y)$ in $\Omega_2$ by:
+    \[
+        p_2(x,y) = P_2 + B_0(y-1) -2B_0 \sum_{n=1}^N \tilde a_n \cos(\pi n x) 
+        \Big( e^{-\pi n |y|} - e^{\pi n (|y|-2)}\Big).
+    \]
+    \item Evaluate $p_1$ for any given $x$ in $\Omega_1$ by:
+    \[
+        p_1(x) = P_2 - B_0 + u_0 \cosh(x/k) - 2 B_0 \sum_{n=1}^N  u_n \cos(\pi n x). 
+    \]    
+\end{enumerate}
+
+Convergence rates of the sums are reasonable. For $a_n$ we have:
+\[
+    \tilde a_n \approx (-1)^n n^{-3} 
+\]
+and for two consecutive terms:
+\[
+    \tilde a_n + \tilde a_{n+1} \approx n^{-3} - (n+1)^{-3} \approx  n^{-4}. 
+\]
+Series for $p_2$ converge exponentialy for $y\ne 0$. Error for $y=0$ is of order $N^{-3}$ with exception
+of  $x=1$ where $\cos(\pi n)$ cancels alternation in $a_n$ and error is $N^{-2}$.
+
+Even better is convergence of $u_n$ sums, since:
+\[
+    u_n \approx (-1)^n n^{-5},\qquad u_n+u_{n+1} \approx  n^{-6}.
+\]
+Thus for calculation of $p_1$ we have error  $N^{-5}$ (for $x=1$ only $N^{-4}$). The error of $U$ is only $N^{-4}$ 
+as the sign alternation cancels with alternation of $a_n$.
+Practical behavior of errors follows these estimates.
+
 
 
 \section{Barrier fracture}
 \label{sec:barrier_frac}
-The case with discontinuous $p_2$ accross the fracture is solved by the similar procedure as the continuous case, 
-but is slightly more technical. Considering the $y$ axis symmetry of the problem $(\ref{eq:Darcy_common} - \ref{eq:bc_1})$ and 
+The case with discontinuous $p_2$ accross the fracture is solved by the same approach as the continuous case, 
+but the derivation is slightly more technical. Considering the $y$ axis symmetry of the problem $(\ref{eq:Darcy_common} - \ref{eq:bc_1})$ and 
 the coupling $(\ref{eq:bc_barrier_p} - \ref{eq:coupling_barrier})$, we can consider the same system of equations 
 on reduced domains $\Omega_2^+ = (0,1)\times (0,1)$, $\Omega_2^- = (0,1)\times(-1,0)$,
 $\Omega_1 = (0,1)$. To impose the symmetry we consider homogeneous Neumann boundary condition on the $y$ axis $\{(0,y)\}$.
@@ -411,18 +464,18 @@ $\Omega_1 = (0,1)$. To impose the symmetry we consider homogeneous Neumann bound
 Repeating arguments from Section \ref{sec:p2_conductive} we obtain Fourier expansion for $p_2^+$ and $p_2^-$ similar to \eqref{eq:p2_series}:
 \begin{align}
     \label{eq:p2_barrier_p}
-    p_2^+(x,y) &= P_2^+ + B_0^+(y-1) - u_0\sum_{n=1}^\infty a_n^+ \cos(\pi n x) {\rm sinh} \big(\pi n(1-y)\big),\\ 
+    p_2^+(x,y) &= P_2^+ + B_0^+(y-1) - \ol{u}_0\sum_{n=1}^\infty a_n^+ \cos(\pi n x) {\rm sinh} \big(\pi n(1-y)\big),\\ 
     \label{eq:p2_barrier_m}
-    p_2^-(x,y) &= P_2^- + B_0^-(y-1) - u_0\sum_{n=1}^\infty a_n^- \cos(\pi n x) {\rm sinh} \big(\pi n(1-y)\big).
+    p_2^-(x,y) &= P_2^- + B_0^-(y-1) - \ol{u}_0\sum_{n=1}^\infty a_n^- \cos(\pi n x) {\rm sinh} \big(\pi n(1-y)\big).
 \end{align}
-with some variable $u_0$ to be specified later.
+with some variable $\ol{u}_0$ to be specified later.
 
 The equation for $p_1$ on $\Omega_1$ can be converted to the form similar to \eqref{eq:p1_equation}:
 \begin{equation}
     \label{eq:p1_barrier_equation}
-    - \ol{k}  p_1''(x) + p_1(x) = \ol{P}_2 - \ol{B}_0 - u_0\sum_{n=1}^{\infty} \ol{a}_n \cos(n \pi x) \sinh(n \pi)
+    - \ol{k}  p_1''(x) + p_1(x) = \ol{P}_2 - \ol{B}_0 - \ol{u}_0\sum_{n=1}^{\infty} \ol{a}_n \cos(n \pi x) \sinh(n \pi)
 \end{equation}
-with help of averaged variables:
+where we have used averaged variables:
 
 % \begin{align}
 %     \label{eq:avg_sigma}
@@ -446,28 +499,28 @@ with help of averaged variables:
     \ol{a}_n = \frac{\sigma^+ a_n^+ + \sigma^- a_n^-}{\ol{\sigma}}.  
 \end{gather*}
 
-Then we can repeat derivation in Section \ref{sec:p1_conductive} to get $p_1$ expansion that closely follows
+Then we can repeat steps from Section \ref{sec:p1_conductive} to get $p_1$ expansion that closely follows
 \eqref{eq:p1_series_tmp}:
 
 \begin{equation}
     \label{eq:barrier_p1_series}
-    p_1(x) = \ol{P}_2 -  \ol{B}_0 + u_0 \cosh(x/\ol{k}) - u_0 \sum_{n=1}^\infty  u_n \cos(\pi n x) 
+    p_1(x) = \ol{P}_2 -  \ol{B}_0 + \ol{u}_0 \cosh(x/\ol{k}) - \ol{u}_0 \sum_{n=1}^\infty  \ol{u}_n \cos(\pi n x) 
 \end{equation}
-where finally identify $u_0$ as:
+where we finally identify $\ol{u}_0$ as:
 \begin{equation}
     \label{eq:barrier_u0_def}    
-    u_0 = \frac{P_1 - \ol{P}_2 + \ol{B}_0 + u_0 U}{\cosh(1/\ol{k})},
+    \ol{u}_0 = \frac{P_1 - \ol{P}_2 + \ol{B}_0 + \ol{u}_0 U}{\cosh(1/\ol{k})},
 \end{equation}
 and we set:
 \begin{equation}
     \label{eq:barriaer_un}
-    u_n = \frac{\ol{a}_n \sinh(n \pi)}{1 + (\ol{k} n \pi)^2}, \qquad
-    U =  \sum_{n=1}^{\infty} u_n.
+    \ol{u}_n = \frac{\ol{a}_n \sinh(n \pi)}{1 + (\ol{k} n \pi)^2}, \qquad
+    \ol{U} =  \sum_{n=1}^{\infty} (-1)^n \ol{u}_n.
 \end{equation}
 
 \subsection{Coupling}
 
-Similarly as in Section \ref{sec:cont_coupling}, we plug expansion of $p_2^+$, $p_2^-$, and $p_1$ into \eqref{eq:bc_barrier_p} and \eqref{eq:bc_barrier_m}. 
+As in Section \ref{sec:cont_coupling}, we plug expansion of $p_2^+$, $p_2^-$, and $p_1$ into \eqref{eq:bc_barrier_p} and \eqref{eq:bc_barrier_m}. 
 We group the terms to get Fourier expansion on the left hand side and a known function of $x$ on the right hand side.
 In particular on  $\Gamma^+$ we have:
 % \[
@@ -485,28 +538,27 @@ In particular on  $\Gamma^+$ we have:
 
 \begin{equation}
     \label{eq:fourier_coupling}
-    \frac{{\cal A}_0^+}{2} + \sum^{\infty}_{n=1} {\cal A}_n^+ \cos (n\pi x) =  - u_0 \cosh(x/ \ol{k}).
+    \frac{{\cal A}_0^+}{2} + \sum^{\infty}_{n=1} {\cal A}_n^+ \cos (n\pi x) =  - \ol{u}_0 \cosh(x/ \ol{k}).
 \end{equation}
 with
 \begin{align}
     \label{eq:calA0_1}
     \frac{{\cal A}_0^+}{2} &= \frac{k_2^+ B_0^+}{\sigma^+} - P_2^+ + \ol{P}_2 + B_0^+ - \ol{B}_0\\
     \label{eq:calAn_1}
-    {\cal A}_n^+          &=  u_0a_n^+ \Big( n \pi \frac{k_2^+ }{\sigma^+}  \cosh(n \pi) 
+    {\cal A}_n^+          &=  \ol{u}_0 a_n^+ \Big( n \pi \frac{k_2^+ }{\sigma^+}  \cosh(n \pi) 
         +     \sinh(\pi n)  \Big) 
-        - u_0u_n   
+        - \ol{u}_0 \ol{u}_n   
 \end{align}
-
-Reusing calculation of the Fourier coefficients of the right hand side we have: 
+We reuse the calculation of Fourier coefficients of the right hand side from \eqref{eq:compute_A0} and \eqref{eq:compute_An} to obtain:
 \begin{align}
     \label{eq:calA0_2}
-    {\cal A}_0^+ &= - 2 u_0 \ol{k}\sinh( 1/\ol{k} ), \\
+    {\cal A}_0^+ &= - 2 \ol{u}_0 \ol{k}\sinh( 1/\ol{k} ), \\
     \label{eq:calAn_2}
-    {\cal A}_n^+ &=  -\frac{2u_0 \ol{k}}{1+(\ol{k} n \pi)^2}\sinh(1/\ol{k}).
+    {\cal A}_n^+ &=  - \frac{(-1)^n  2 \ol{u}_0 \ol{k}}{1+(\ol{k} n \pi)^2}\sinh(1/\ol{k}).
 \end{align}
 Analogous relations hold for the lower side on $\Gamma^-$.
 
-Now we combine \eqref{eq:calAn_1} and \eqref{eq:calAn_2}, we cancel $u_0$, and we substitute for $u_n$ using \eqref{eq:barriaer_un}.
+Now we combine \eqref{eq:calAn_1} and \eqref{eq:calAn_2}, we cancel $\ol{u}_0$, and we substitute for $\ol{u}_n$ using \eqref{eq:barriaer_un}.
 Performing the same operation for the ${\cal A}_n^-$  we obtain a system to determine $a_n^+$, $a_n^-$:
 
 \begin{equation}
@@ -542,7 +594,7 @@ where
 % \]
 
 \begin{align}
-    y_n     &= -\frac{2 \ol{k}}{1+(\ol{k} n \pi)^2}\sinh(1/\ol{k}), \\
+    y_n     &= -\frac{(-1)^n 2 \ol{k}}{1+(\ol{k} n \pi)^2}\sinh(1/\ol{k}), \\
     X_n^{00}  &= n \pi \frac{k_2^+ }{\sigma^+}  \cosh(n \pi) 
               + \sinh(\pi n)  - \frac{\sigma^+ }{\ol{\sigma}}\frac{\sinh(n \pi)}{1 + (\ol{k} n \pi)^2}, \\
     X_n^{01}  &= \frac{\sigma^- }{\ol{\sigma}}\frac{\sinh(n \pi)}{1 + (\ol{k} n \pi)^2}, \\
@@ -551,14 +603,14 @@ where
     X_n^{10}  &= \frac{\sigma^+ }{\ol{\sigma}}\frac{\sinh(n \pi)}{1 + (\ol{k} n \pi)^2}. 
 \end{align}
 The system matrix is strictly diagonally dominant providing $k_2^{+/-}$, $\sigma^{+/-}$, $k_1$ are positive.
-As the right hand side is negative the coeeficients $a_n^{+/-}$ are all negative as well.
+There for coefficients $a_n^{+/-}$ have the sign same as the right hand side, that is $(-1)^{n+1}$.
 
 
-Now we express $u_0$ from \eqref{eq:barrier_u0_def}:
+Now we express $\ol{u}_0$ from \eqref{eq:barrier_u0_def}:
 \[
-    u_0 = \frac{P_1 - \ol{P}_2 + \ol{B}_0}{\cosh(1/\ol{k}) - U}
+    \ol{u}_0 = \frac{P_1 - \ol{P}_2 + \ol{B}_0}{\cosh(1/\ol{k}) - U}
 \]
-and we plug it into  \eqref{eq:calA0_2} which we compare to \eqref{eq:calA01}. Taking a same procedure for ${\cal A}_0^-$ we
+and we plug it into  \eqref{eq:calA0_2} which we compare to \eqref{eq:calA0_1}. Taking the same procedure for ${\cal A}_0^-$ we
 obtain a system for $B_0^+$, $B_0^-$:
 
 
@@ -579,62 +631,33 @@ The system matrix is strictly diagonally dominant as long as
 \[
     \frac{k_2^{+/-}}{\sigma^{+/-}} + 1 > 1 > T -1.
 \]
-Since $a_n^{+/-}$ are negative so are $u_n$ and $U$. Then
+\todo{Since $a_n^{+/-}$ have sign $(-1)^{n+1}$ and are negative so are $\ol{u}_n$ and $\ol{U}$.} Then
 \[
     T < \ol{k}\, {\rm tanh}( 1/\ol{k} ) < 1
 \]
 and the system matrix is always strictly diagonally dominant.
 
+\section{Evaluation procedure}
+
 Evaluation of the solution is performed in following steps:
 \begin{enumerate}
-    \item Determine number of terms $N$ in the series.
+    \item Choose number of terms $N$ in the truncated sums.
     \item Solve systems \eqref{eq:an_system} to obtain $a_n^+$, $a_n^-$ for $n=1,\dots, N$.
-    \item Compute $u_n$ and the sum $U$.
+    \item Compute $\ol{u}_n$ and the sum $\ol{U}$.
     \item Solve system $(\ref{eq:B0_system_p} - \ref{eq:B0_system_m})$ for $B_0^+$, $B_0^-$.
-    \item Compute $u_0$.
-    \item Evaluate $p_1$ or $p_2^+$, $p_2^-$ by partial sumation of series \eqref{eq:barrier_p1_series},
-          \eqref{eq:p2_series_p}, \eqref{eq:p2_series_m}, respectively.
+    \item Compute $\ol{u}_0$.
+    \item Evaluate $p_1$ or $p_2^+$, $p_2^-$ by truncated summation of the series \eqref{eq:barrier_p1_series},
+          \eqref{eq:p2_barrier_p}, \eqref{eq:p2_barrier_m}, respectively.
 \end{enumerate}
 
+\section{Verification by finite differences}
 
-\section{Evaluation of series}
 
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\subsubsection{Výsledné vztahy pro výpoèet tlaku}
-
-Nyní ji mùeme vyjádøit vztahy pro výpoèet tlaku v øeené oblasti. Pro výpoèet tlaku na puklinì pouijeme rovnici (\ref{r_34})
-
-\begin{equation}
-\nonumber
-p_1(x) = \left(P_1 - \tilde{P}_2 + \tilde{B}_0 + \sum\limits_{n=1}^{\infty} \tilde{u}_n \right) \frac{\cosh(K(1 - x))}{\cosh K} + \tilde{P}_2 - \tilde{B}_0 - \sum\limits_{n=1}^{\infty} \tilde{u}_n \cos(n \pi x)
-\end{equation}
-
-\noindent
-do které za $\tilde{u}_n$ dosadíme
-
-\begin{equation}
-\nonumber
-\tilde{u}_n = \frac{\tilde{\omega} \left( 1 - e^{-2n\pi} \right) \left( \alpha^+ \sigma^+ + \alpha^- \sigma^- \right)}{2 \left( n^2 \pi^2 k_1 + \tilde{\sigma} \right)^2}
-\end{equation}
-
-\noindent
-Pro výpoèet tlaku v okolním prostøedí pouijeme rovnice (\ref{r_18}) a (\ref{r_19}), do kterých dosadíme (\ref{r_49}) a (\ref{r_50}). Z dùvodu pøesnìjího výpoètu pøi implementaci vztahù do Matlabu a Pythonu nahradíme hyperbilickou funkci exponenciální. Tedy $\sinh(n\pi) = \frac{1}{2} \left( e^{n\pi} - e^{-n\pi} \right)$. Po dalích úpravách pøi kterých ze vztahu eliminujeme $e^{n\pi}$ dostaneme
-
-\begin{equation}
-\nonumber
-p_2^+(x,y) = P_2^+ - B_0^+ + B_0^+y - \sum\limits_{n=1}^{\infty} \frac{\alpha^+ \tilde{\omega} }{2 \left( n^2 \pi^2 k_1 + \tilde{\sigma} \right)} \left( e^{-n\pi y} - e^{-n\pi(2-y)} \right) \cos(n\pi x )
-\end{equation}
-
-\begin{equation}
-\nonumber
-p_2^-(x,y) = P_2^- - B_0^- + B_0^-y - \sum\limits_{n=1}^{\infty} \frac{\alpha^- \tilde{\omega} }{2 \left( n^2 \pi^2 k_1 + \tilde{\sigma} \right)} \left( e^{-n\pi y} - e^{-n\pi(2-y)} \right) \cos(n\pi x )
-\end{equation}
-
-\noindent
-Máme ji vyjádøeny i vztahy pro výpoèet vech koeficientù, které je tøeba vypoèítat a následnì dosadit do koneèných vztahù pro výpoèet tlakù. Tyto koeficienty mùeme rozdìlit na dvì skupiny. Ty, které nejsou závislé na souøadnicích ani na promìnné $n$, pouívané ve výpoètech souètù. Konkrétnì to jsou $B_0^+$, $B_0^-$, $\tilde{B}_0$ a  $\tilde{\omega}$. Vechny dostaneme ze soustavy rovnic (\ref{r_51}) - (\ref{r_54}) a jeliko se jedná o konstanty, staèí je vypoèítat pouze jednou. Dále pak máme koeficienty, které pouíváme ve výpoètech sum a jsou tedy závislé na promìnné $n$. Sem patøí $\tilde{u}_n$, $\alpha^+$ a $\alpha^-$. I ty si mùeme pøedpoèítat a jejich hodnoty pro rùzná $n$ uloit do pole. K jejich výpoètu pouijeme soustavu rovnic (\ref{r_45}) a (\ref{r_48}). K výpoètu $\tilde{u}_n$ pouijeme výe uvedený vztah.
-
-Konkrétní hodnotu tlaku v libovolném místì pukliny získáme dosazením poadované souøadnice $x$ do rovnice pro $p_1(x)$. Tlak v libovolném místì 2D oblasti získáme dosazením souøadnic $x$ a $y$ do rovnic $p_2^+(x,y)$ pro èást nad puklinou nebo do rovnice $p_2^-(x,y)$ pro èást oblasti pod puklinou.
+\begin{figure}
+  \centering
+  \includegraphics[width=\textwidth, keepaspectratio=true]{./continuous_convergency_crop.pdf}
+  % continuous_convergency.pdf: 0x0 pixel, 300dpi, 0.00x0.00 cm, bb=
+  \caption{}
+\end{figure}
 
 \end{document}
