@@ -1,0 +1,12 @@
+1) Pro P0 metodu mohou byt matice velmi spatne podminene i pro male site pokud pomer h2/h1 je velmi maly.
+   Dokonce vychazeji i zaporna vlastni cisla (ale jsou to odhady z CG metody) !!
+   
+   Je SKUTECNE pravda, ze i pro svazanou ulohu jsou elementove tlaky rovny prumerum hranovych tlaku, nebo tim
+   zavadim nevhodnou aproximaci?
+   
+
+3) Vhodny predpodminovac?
+
+4) pokusit se nechat sebehnout vice testu od jednoho nastaveni s randomizovanou siti.
+
+5) Dodelat poradne okrajove podminky a testovat to na vice puklinach.
