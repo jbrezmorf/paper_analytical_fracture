@@ -69,7 +69,8 @@ class ContinousFracture:
     def precompute_analytical(self):
         self.k = np.sqrt(self.k1 / 2.0 / self.sigma)
 
-        n_err_terms = int(0.2*self.n_terms)
+        #n_err_terms = int(0.2*self.n_terms)
+        n_err_terms = self.n_terms
         n_terms = self.n_terms + n_err_terms
         nn = self.n_series = np.arange(1, n_terms, 1.0)
         k_pi = self.k * np.pi
@@ -94,7 +95,7 @@ class ContinousFracture:
         #self.un = self.an * self.sinh(np.pi*nn) / (1.0 + k_n_pi_sqr)
 
         u_sum = np.sum( (alternate * self.un)[:self.n_terms] )
-        u_sum_err = np.sum( (alternate * self.un)[self.n_terms:] )
+        u_sum_err = np.sum( (alternate * self.un)[:self.n_terms-1:-1] )
 
         self.B0 = (self.P2 - self.P1) / ( \
                     1.0 + 2 * u_sum \
@@ -105,11 +106,23 @@ class ContinousFracture:
         alt_u0 = (self.P1 -self.P2 + self.B0*(1+2*u_sum)) / np.cosh(1.0 / self.k)
 
         an_err = np.sum(self.an[self.n_terms:] )
+        an_abs_err = np.sum(np.abs(self.an[self.n_terms:]))
+        un_abs_err = np.sum( np.abs(self.un[:self.n_terms-1:-1]) )
+        u_sum_err = np.sum( self.un[:self.n_terms - 1:-1])
 
-        print("un_err: ", u_sum_err, "an_err:", an_err)
-        print("u0:", self.u0)
-        print("alt_u0:", alt_u0)
-        assert np.isclose(self.u0, alt_u0)
+        nn = nn[self.n_terms:]
+        err = []
+        for i in range(1, 10):
+            e = np.log(np.abs(np.sum( np.cos(nn*np.pi/i)*self.an[self.n_terms:])))
+            err.append(e)
+        print(err)
+        #an_x2_err = np.sum(np.cos(nn * np.pi) * self.un[self.n_terms:])
+
+
+        #print("un_err: ", np.log(np.abs(u_sum_err)), "un_abs_err:", np.log(np.abs(un_abs_err)),
+        #      "an_err: ", np.log(np.abs(an_err)), "an_abs_err:", np.log(np.abs(an_abs_err)))
+        # print("alt_u0:", alt_u0)
+        # assert np.isclose(self.u0, alt_u0)
 
         self.vec_eval_p2 = np.vectorize(self.eval_p2)
         self.vec_eval_p1 = np.vectorize(self.eval_p1)
@@ -284,61 +297,6 @@ class ContinousFracture:
         return (x,y, p1_vec, p2_mat)
 
 
-class BurdaFrac(ContinousFracture):
-    def precompute_analytical(self):
-        self.k = np.sqrt(self.k1 / 2.0 /self.sigma)
-
-        nn = self.n_series = np.arange(1, self.n_terms, 1.0)
-        k_pi = self.k * np.pi
-        k_n_pi_sqr = (k_pi * self.n_series) ** 2
-        m2_pi = -2.0 * np.pi
-        exp_pi_m2_n = np.exp(m2_pi * nn)
-        self.sinh_pi_n = 0.5 * (1.0 - exp_pi_m2_n)
-        self.cosh_pi_n = 0.5 * (1.0 + exp_pi_m2_n)
-        an_denom = self.k2 * np.pi * nn * self.cosh_pi_n \
-                   * (1.0 + k_n_pi_sqr) \
-                   + self.sigma * k_n_pi_sqr * self.sinh_pi_n
-
-        #alternate = np.empty((self.n_terms-1,), float)
-        #alternate[::2] = -1      # 0 is n=1, thus odd
-        #alternate[1::2] = +1
-
-        self.an =  self.k2 / an_denom
-        self.un = self.an * self.sinh_pi_n / (1.0 + k_n_pi_sqr)
-
-        u_sum = np.sum( self.un)
-        self.B0 = (self.P2 - self.P1) / ( \
-                    1.0 + 2 * u_sum \
-                    + self.k2 * np.cosh(1.0 / self.k) \
-                    / self.sigma / self.k / np.sinh(1.0 / self.k) \
-            )
-        self.u0 = self.k2 * self.B0 / (self.sigma * self.k * np.sinh(1.0 / self.k))
-        alt_u0 = (self.P1 -self.P2 + self.B0*(1+2*u_sum)) / np.cosh(1.0 / self.k)
-        print("u_sum: ", u_sum)
-        print("u0:", self.u0)
-        print("alt_u0:", alt_u0)
-
-        #assert np.isclose(self.u0, alt_u0)
-
-    def eval_p2(self, x, y):
-        x = 1-np.abs(x)
-
-        y = np.abs(y)
-        pi_x = np.pi * x
-        pi_1y_m2 = -2 * np.pi * (1 - y)
-
-        series_sum = np.sum(self.an * np.cos(pi_x * self.n_series)
-                            * 0.5 * (1.0 - np.exp(pi_1y_m2 * self.n_series)))
-        p2_sum = self.P2 + self.B0 * (y - 1) - 2 * self.B0 * series_sum
-        return p2_sum
-
-    def eval_p1(self, x):
-        x = 1 - np.abs(x)
-        #x = np.abs(x)
-        pi_x = np.pi * x
-        series_sum = np.sum(self.un * np.cos(pi_x * self.n_series))
-        p1_sum = self.P2 - self.B0 - self.u0 * np.cosh((1-x)  / self.k) - 2 * self.B0 * series_sum
-        return p1_sum
 
 
 
@@ -599,6 +557,11 @@ def error_decay(plot = False):
 
 #p1_l2, p2_l2, p1_diff, p2_diff = compute_error(100, 100, 0.01, 1, y_band=False)
 
-error_decay()
+#error_decay()
 
 #plot_test()
+
+ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=10)
+ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=100)
+ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=1000)
+ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=10000)
