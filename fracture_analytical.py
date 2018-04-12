@@ -4,9 +4,9 @@ import scipy.sparse as sparse
 import scipy.sparse.linalg as sp_la
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib import rc
-rc('text', usetex=True)
-rc('font', family='serif')
+#from matplotlib import rc
+#rc('text', usetex=True)
+#rc('font', family='serif')
 ## for Palatino and other serif fonts use:
 #rc('font',**{'family':'serif','serif':['Palatino']})
 
@@ -297,39 +297,75 @@ class ContinousFracture:
         return (x,y, p1_vec, p2_mat)
 
 
+def add_text(ax, data, text, shift):
+    y = data[int(len(data)/2)]
+    ax.text(0.0, y+shift, text, horizontalalignment='center')
 
 
+def plot_solution():
+    """
+    Plot both analytical and FD solution. and errors
+    :return:
+    """
+    ac = ContinousFracture(k1=10, k2=1, sigma=20, P1=5, P2=10, n_terms=1000)
 
-def plot_test():
-    ac = ContinousFracture(k1=0.1, k2=1, sigma=1, P1=5, P2=10, n_terms=3)
+    nx,  ny = 200, 200
+    x, y, p1_fd, p2_fd = ac.solve_fd(nx, ny)
 
-    #ac = BurdaFrac(k1=0.1, k2=1, sigma=3, P1=5, P2=10, n_terms=10000)
-    nx,  ny = 100, 100
-    x, y, p1, p2 = ac.solve_fd(nx, ny)
-
-    fig = plt.figure(figsize=(15, 5))
+    fig = plt.figure(figsize=(13, 5))
     ax = fig.add_subplot(121)
     ax_err = fig.add_subplot(122)
 
-    ax.plot(x, p1, '.', label="p1fd")
-    ac_p1 = ac.plot_p1(ax, x)
-    ax_err.plot(x, p1 - ac_p1, label="p1-a_p1")
 
-    y_cuts = [0, 0.2, 0.5, 0.8, 1]
+
+
+    #norm = matplotlib.colors.Normalize(0, 1)
+    cmap_an = matplotlib.cm.get_cmap('autumn')
+    cmap_fd = matplotlib.cm.get_cmap('winter')
+
+    y_cuts = [0, 0.2, 0.4, 0.6, 0.8, 1]
     for y in y_cuts:
         iy = int(y*ny/2)
         y_true = 2.0/ny * iy
         iy = int(ny/2) - iy
-        p2_ycut = p2[iy, :]
-        ax.plot(x, p2_ycut, '.', label="p2fd, y={}".format(y_true))
-        ac_p2 = ac.plot_p2(ax, x, y_true)
+        p2_ycut = p2_fd[iy, :]
 
-        ax_err.plot(x, p2_ycut - ac_p2, label="p2-a_p2, y={}".format(y))
+        p2_plt, = ax.plot(x, p2_ycut, linewidth=3, color="blue", label="p2, fd, y={:4.2f}".format(y_true))
+        #fd_plots.append(p2_plt)
+        p2_an = ac.vec_eval_p2(x, y_true)
+        p2_plt, = ax.plot(x, p2_an, color="orange", label="p2, an, y={:4.2f}".format(y_true))
+        #an_plots.append(p2_plt)
+        add_text(ax, p2_ycut, "p2, y={:4.2f}".format(y_true), 0.1)
+
+        ax_err.plot(x, p2_ycut - p2_an, color=cmap_fd(y_true), label="p2_diff, y={:4.2f}".format(y_true))
+
+    #fd_plots = []
+    #an_plots = []
+    p1_plt, = ax.plot(x, p1_fd, linewidth=3, color='blue', label="p1, fd")
+
+    #fd_plots.append(p1_plt)
+    p1_an = ac.vec_eval_p1(x)
+    p1_plt, = ax.plot(x, p1_an, color='orange', label="p1, an")
+    #an_plots.append(p1_plt)
+    add_text(ax, p1_fd, "p1", -0.3)
+
+    ax_err.plot(x, p1_fd - p1_an, color='red', label="p1_diff")
+
+    ax.set_xlabel("x")
+    ax.set_ylim((4.5,10.5))
+
+    #ax_err.legend(bbox_to_anchor=(1.05, 1), loc=0, borderaxespad=0.)
+    ax_err.legend(loc=9)
+    ax_err.set_xlabel("x")
+    ax_err.set_ylabel("difference")
+    ax_err.ticklabel_format(style='sci', scilimits=(0,0))
 
     #y = (ac.P1 - ac.P2) * np.cosh( x/ac.k1) / np.cosh(1/ac.k1) + ac.P2
     #ax.plot(x, y, label="ref")
 
-    ax_err.legend(bbox_to_anchor=(1.05, 1), loc=0, borderaxespad=0.)
+    #all_plots = fd_plots + an_plots
+    #labels = [ plot.get_label() for plot in all_plots]
+    #ax.legend(all_plots, labels, bbox_to_anchor=(-.05, 1), loc=0, borderaxespad=0.)
 
     #stripes=[0.0001, 0.00033, 0.001, 0.0033, 0.01, 0.033, 0.1, 0.33, 1]
     #ac.plot_analytical()
@@ -350,9 +386,10 @@ def plot_test():
     #
     # ax_right.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     # ax_right.set_xlabel("Y direction")
-    ax.legend(bbox_to_anchor=(-.05, 1), loc=0, borderaxespad=0.)
-    plt.show()
 
+    plt.savefig("continuous_solution.pdf", bbox_inches='tight')
+    plt.show()
+    return
     # compute approx of -k2*\Lapl p_2 for analytical sol.
 
     fig = plt.figure()
@@ -412,7 +449,7 @@ def plot_p2_field(x, y, p2_diff):
     plt.show()
 
 
-def compute_error(n_terms, fd_n, k1, sigma, y_band=True):
+def compute_error(n_terms, fd_n, k1, sigma, y_band=0.5):
     ac = ContinousFracture(k1=k1, k2=1, sigma=sigma, P1=5, P2=10, n_terms=n_terms)
     nx,  ny = fd_n, fd_n
     x, y, p1, p2 = ac.solve_fd(nx, ny)
@@ -420,8 +457,8 @@ def compute_error(n_terms, fd_n, k1, sigma, y_band=True):
     p1_diff = ac.vec_eval_p1(x) -p1
     p1_l2 = la.norm( p1_diff) * np.sqrt(2.0 / nx)
 
-    if y_band:
-        band = np.arange(int(ny/2*0.9), int(ny/2*1.1), 1)
+    if y_band > 0:
+        band = np.arange(int(ny/2*y_band), int(ny/2*1.1), 1)
         print(fd_n, len(band), len(band)*len(x)*2.0/ nx * 2.0/ ny)
     else:
         band = np.arange(0, len(y), 1)
@@ -543,7 +580,7 @@ def error_decay(plot = False):
     # n_terms_list =  [10, 100, 1000, 10000]
     # nx_list = [10, 20, 40, 80, 160, 320]
     n_terms_list =  [10, 50, 100, 200, 500]
-    nx_list = [20, 40, 80, 160, 320, 640, 1280]
+    nx_list = [20, 40, 80, 160, 320] #, 640, 1280]
 
 
     err_table = np.empty((len(n_terms_list), len(nx_list), 2))
@@ -554,14 +591,95 @@ def error_decay(plot = False):
     plot_decay(err_table, n_terms_list, nx_list)
 
 
+def error_decay_parameter_study():
+    sigma_bounds = np.arange(-2, 4, 1)
+    k1_bounds = np.arange(-2, 4, 1)
+    sigma_list = (sigma_bounds[0:-1] + sigma_bounds[1:])/2
+    k1_list = (k1_bounds[0:-1] + k1_bounds[1:]) / 2
+    fit_table = np.empty( (len(sigma_list), len(k1_list), 2, 2))
+    for isg, sigma_log in enumerate(sigma_list):
+        for ik1, k1_log in enumerate(k1_list):
+            sigma = 10.0**sigma_log
+            k1 = 10.0**k1_log
+            nx_list = [20, 40, 80]
+            err_table = np.empty( (len(nx_list), 2) )
+            for inx, nx in enumerate(nx_list):
+                err_table[inx, :] = compute_error(100, nx, k1, sigma, y_band=0.1)
+            fit_table[isg, ik1,:, :] = np.polyfit(np.log(np.array(nx_list)), np.log2(err_table[:,:]), deg = 1)
+
+    fig = plt.figure(figsize=(16, 3))
+
+    ax = fig.add_subplot(141)
+    ax.set_ylabel("$k_1$")
+    ax_list =  [
+        ax,
+        fig.add_subplot(142, sharey = ax),
+        fig.add_subplot(143, sharey = ax),
+        fig.add_subplot(144, sharey = ax)
+    ]
+    im_list =[]
+    X,Y = np.meshgrid(10.0**sigma_bounds, 10.0**k1_bounds)
+
+    cm = [ matplotlib.cm.get_cmap('plasma'), matplotlib.cm.get_cmap('viridis') ]
+    for i_deg in [0, 1]:
+        for i_dim in [0, 1]:
+            ii = i_dim +  2*i_deg
+            ax = ax_list[ii]
+            #ax.axis('equal')
+            im = ax.pcolormesh(X, Y, -fit_table[:,:, i_deg, i_dim], cmap=cm[i_deg])
+            ax.set_xscale('log')
+            ax.set_yscale('log')
+            im_list.append(im)
+            #ax.set_xticks(np.arange(0, len(sigma_list), 1))
+            #ax.set_yticks(np.arange(0, len(k1_list), 1))
+            #ax.set_xticklabels(10.0 ** sigma_list)
+            #ax.set_yticklabels(10.0 ** k1_list)
+            #ax.ticklabel_format(style='sci', scilimits=(0, 0))
+
+
+            ax.tick_params(
+                axis='both',  # changes apply to the x-axis
+                which='minor',  # both major and minor ticks are affected
+                left='off',
+                bottom='off')  # labels along the bottom edge are off
+
+            if ii > 0:
+                ax.tick_params(
+                    axis='y',  # changes apply to the x-axis
+                    which='both',  # both major and minor ticks are affected
+                    labelleft='off')  # labels along the bottom edge are off
+
+
+    ax_list[0].set_xlabel("$\sigma$, order, p1 ")
+    ax_list[1].set_xlabel("$\sigma$, order, p2 ")
+    ax_list[2].set_xlabel("$\sigma$, abs_err, p1 ")
+    ax_list[3].set_xlabel("$\sigma$, abs_err, p2 ")
+    fig.colorbar(im_list[0], ax=ax_list[:2])
+    fig.colorbar(im_list[2], ax=ax_list[2:])
+
+    # Adding the colorbar
+    # cb_ax = fig.add_axes([0.1, 0.1, 0.03, 0.8])  # This is the position for the colorbar
+    # fig.colorbar(im_list[0], cax=cb_ax)
+    #
+    # cb_ax = fig.add_axes([3, 0.1, 0.03, 0.8])  # This is the position for the colorbar
+    # fig.colorbar(im_list[2], cax=cb_ax)
+
+    #plt.tight_layout()
+    #plt.gcf().subplots_adjust(bottom=0.15)
+    plt.savefig("continuous_conv_rate.pdf", bbox_inches='tight')
+    plt.show()
+
+
+#plot_solution()
+
 
 #p1_l2, p2_l2, p1_diff, p2_diff = compute_error(100, 100, 0.01, 1, y_band=False)
 
 #error_decay()
 
-#plot_test()
+error_decay_parameter_study()
 
-ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=10)
-ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=100)
-ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=1000)
-ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=10000)
+#ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=10)
+#ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=100)
+#ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=1000)
+#ac = ContinousFracture(k1=0.01, k2=1, sigma=1, P1=5, P2=10, n_terms=10000)
