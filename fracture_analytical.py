@@ -449,8 +449,8 @@ def plot_p2_field(x, y, p2_diff):
     plt.show()
 
 
-def compute_error(n_terms, fd_n, k1, sigma, y_band=0.5):
-    ac = ContinousFracture(k1=k1, k2=1, sigma=sigma, P1=5, P2=10, n_terms=n_terms)
+def compute_error(n_terms, fd_n, k2, sigma, y_band=0.5):
+    ac = ContinousFracture(k1=1, k2=k2, sigma=sigma, P1=5, P2=10, n_terms=n_terms)
     nx,  ny = fd_n, fd_n
     x, y, p1, p2 = ac.solve_fd(nx, ny)
 
@@ -592,8 +592,8 @@ def error_decay(plot = False):
 
 
 def error_decay_parameter_study():
-    sigma_bounds = np.arange(-2, 4, 1)
-    k1_bounds = np.arange(-2, 4, 1)
+    sigma_bounds = np.arange(-2, 4, 0.25)
+    k1_bounds = np.arange(-2, 4, 0.25)
     sigma_list = (sigma_bounds[0:-1] + sigma_bounds[1:])/2
     k1_list = (k1_bounds[0:-1] + k1_bounds[1:]) / 2
     fit_table = np.empty( (len(sigma_list), len(k1_list), 2, 2))
@@ -601,7 +601,7 @@ def error_decay_parameter_study():
         for ik1, k1_log in enumerate(k1_list):
             sigma = 10.0**sigma_log
             k1 = 10.0**k1_log
-            nx_list = [20, 40, 80]
+            nx_list = [20, 40, 80, 160, 320]
             err_table = np.empty( (len(nx_list), 2) )
             for inx, nx in enumerate(nx_list):
                 err_table[inx, :] = compute_error(100, nx, k1, sigma, y_band=0.1)
@@ -610,7 +610,7 @@ def error_decay_parameter_study():
     fig = plt.figure(figsize=(16, 3))
 
     ax = fig.add_subplot(141)
-    ax.set_ylabel("$k_1$")
+    ax.set_ylabel("$k_2$")
     ax_list =  [
         ax,
         fig.add_subplot(142, sharey = ax),
@@ -670,7 +670,7 @@ def error_decay_parameter_study():
     plt.show()
 
 
-#plot_solution()
+plot_solution()
 
 
 #p1_l2, p2_l2, p1_diff, p2_diff = compute_error(100, 100, 0.01, 1, y_band=False)

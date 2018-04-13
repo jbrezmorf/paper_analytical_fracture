@@ -4,10 +4,10 @@ import scipy.sparse as sparse
 import scipy.sparse.linalg as sp_la
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib import rc
-rc('text', usetex=True)
-rc('font', family='serif')
-## for Palatino and other serif fonts use:
+#from matplotlib import rc
+#rc('text', usetex=True)
+#rc('font', family='serif')
+# for Palatino and other serif fonts use:
 #rc('font',**{'family':'serif','serif':['Palatino']})
 
 
@@ -68,105 +68,107 @@ class BarrierFracture:
 
     def precompute_analytical(self):
         avg_sigma = self.sigma[0] + self.sigma[1]
-        avg_k = np.sqrt(self.k1 / avg_sigma)
-        avg_P2 = (self.sigma[0]*self.k2[0] + self.sigma[1] *self.k2[1]) / avg_sigma
+        self.avg_k = np.sqrt(self.k1 / avg_sigma)
+        self.avg_P2 = (self.sigma[0]*self.P2[0] + self.sigma[1] *self.P2[1]) / avg_sigma
 
 
         #n_err_terms = int(0.2*self.n_terms)
         n_err_terms = self.n_terms
         n_terms = self.n_terms + n_err_terms
-        nn = self.n_series = np.arange(1, n_terms, 1.0)
+        nn = self.n_series = np.arange(1, n_terms+1, 1.0)
 
         # Solve a_n systems
         self.an = np.empty((n_terms, 2))
+        self.un = np.empty((n_terms,))
         X_mat = np.empty((2, 2))
         y_vec = np.empty((2,))
-        for i, an_ in enumerate(self.an):
+        for i in range(n_terms):
             n = i + 1
-            sign = (-1)**n
-            y_vec[0] = y_vec[1] = sign *2 * avg_k * np.sinh(1/avg_k) / (1 + (avg_k * n * np.pi)**2.0)
+            sign = int(2* (i % 2) - 1)
+
+            ############### an system and un
+            cosh_npi = (1 + np.exp(-2.0 * n * np.pi))
+            sinh_npi = (1 - np.exp(-2.0 * n * np.pi))
+            sqr_npik_one = (1.0 +  (n * np.pi * self.avg_k)**2.0)
+            diagonal_p = n * np.pi * self.k2[0] / self.sigma[0] * cosh_npi + sinh_npi
+            diagonal_m = n * np.pi * self.k2[1] / self.sigma[1] * cosh_npi + sinh_npi
+            off_diagonal = sinh_npi /avg_sigma / sqr_npik_one
+
+            y_vec[0] = y_vec[1] = -sign * 2 * self.avg_k * np.sinh(1 / self.avg_k) / sqr_npik_one
+            X_mat[0, 0] = diagonal_p - self.sigma[0] * off_diagonal
+            X_mat[1, 1] = diagonal_m - self.sigma[1] * off_diagonal
+            X_mat[0, 1] = -self.sigma[1] * off_diagonal
+            X_mat[1, 0] = -self.sigma[0] * off_diagonal
+
+            self.an[i, :] = la.solve(X_mat, y_vec)
+            avg_an = (self.sigma[0] * self.an[i, 0] + self.sigma[1] * self.an[i, 1])/ avg_sigma
+            self.un[i] = avg_an * sinh_npi / sqr_npik_one
 
 
-            ############################################3
+        u_sum = -np.sum(np.abs(self.un))
 
+        ### B0 system
+        T = self.avg_k * np.sinh(1/self.avg_k) / ( np.cosh(1/self.avg_k) - u_sum)
+        y_vec[0] = y_vec[1] = - self.avg_P2 +(self.avg_P2 - self.P1) * T
+        y_vec[0] += self.P2[0]
+        y_vec[1] += self.P2[1]
+        X_mat[0, 0] = self.k2[0]/self.sigma[0] + 1 + (T-1)*self.sigma[0] / avg_sigma
+        X_mat[1, 1] = self.k2[1]/self.sigma[1] + 1 + (T-1)*self.sigma[1] / avg_sigma
+        X_mat[0, 1] = (T-1) * self.sigma[1] / avg_sigma
+        X_mat[1, 0] = (T-1) * self.sigma[0] / avg_sigma
 
+        self.B0 = la.solve(X_mat, y_vec)
+        #print(self.B0)
+        self.avg_B0 = (self.sigma[0] * self.B0[0] + self.sigma[1] * self.B0[1])/ avg_sigma
+        #print(np.cosh(1/self.avg_k), u_sum, self.P1 - self.avg_P2)
+        self.u0 = (self.P1 - self.avg_P2 + self.avg_B0) / (np.cosh(1/self.avg_k) - u_sum)
 
-        k_pi = self.k * np.pi
-
-        k_n_pi_sqr = (k_pi * self.n_series) ** 2
-        m2_pi = -2.0 * np.pi
-        exp_pi_m2_n = np.exp(m2_pi * nn)
-        self.sinh_pi_n = (1.0 - exp_pi_m2_n)
-        self.cosh_pi_n = (1.0 + exp_pi_m2_n)
-        an_denom = self.k2 * np.pi * nn * self.cosh_pi_n \
-                    * (1.0 + k_n_pi_sqr) \
-                    + self.sigma * k_n_pi_sqr * self.sinh_pi_n
-        #an_denom = self.k2 * np.pi * nn * self.cosh(nn *np.pi) \
-        #           * (1.0 + k_n_pi_sqr) \
-        #           + self.sigma * k_n_pi_sqr * self.sinh(nn*np.pi)
-
-        alternate = np.empty((n_terms-1,), float)
-        alternate[::2] = -1      # 0 is n=1, thus odd
-        alternate[1::2] = +1
-
-        self.an = alternate * self.k2 / an_denom
-        self.un = self.an * self.sinh_pi_n / (1.0 + k_n_pi_sqr)
-        #self.un = self.an * self.sinh(np.pi*nn) / (1.0 + k_n_pi_sqr)
-
-        u_sum = np.sum( (alternate * self.un)[:self.n_terms] )
-        u_sum_err = np.sum( (alternate * self.un)[:self.n_terms-1:-1] )
-
-        self.B0 = (self.P2 - self.P1) / ( \
-                    1.0 + 2 * u_sum \
-                    + self.k2 * np.cosh(1.0 / self.k) \
-                    / self.sigma / self.k / np.sinh(1.0 / self.k) \
-            )
-        self.u0 = -self.k2 * self.B0 / (self.sigma * self.k * np.sinh(1.0 / self.k))
-        alt_u0 = (self.P1 -self.P2 + self.B0*(1+2*u_sum)) / np.cosh(1.0 / self.k)
-
-        an_err = np.sum(self.an[self.n_terms:] )
-
-        print("un_err: ", u_sum_err, "an_err:", an_err)
-        print("U:", u_sum)
-        # print("alt_u0:", alt_u0)
-        # assert np.isclose(self.u0, alt_u0)
-
+        # an_err = np.sum(self.an[self.n_terms:] )
+        #
+        # print("un_err: ", u_sum_err, "an_err:", an_err)
+        # print("U:", u_sum)
+        # # print("alt_u0:", alt_u0)
+        # # assert np.isclose(self.u0, alt_u0)
+        #
         self.vec_eval_p2 = np.vectorize(self.eval_p2)
         self.vec_eval_p1 = np.vectorize(self.eval_p1)
 
 
     def eval_p2(self, x, y):
-        y = np.abs(y)
-        pi_x = np.pi * x
-        pi_1y_m2 = -2 * np.pi * (1 - y)
+        if y > 0:
+            idx = 0
+        else:
+            idx = 1
 
-        series_sum = np.sum(self.an * np.cos(pi_x * self.n_series)
+        y = np.abs(y)
+
+        pi_x = np.pi * x
+        series_sum = np.sum(self.an[:,idx] * np.cos(pi_x * self.n_series)
                             * (np.exp( (-y * np.pi) * self.n_series ) - np.exp( ((y-2.0)*np.pi) * self.n_series ) ) )
 
-
-        #terms = self.an * np.cos(pi_x * self.n_series)*self.sinh(np.pi * (1 - y) * self.n_series)
-        #series_sum = np.sum(terms)
-        p2_sum = self.P2 + self.B0 * (y - 1) - 2 * self.B0 * series_sum
+        p2_sum = self.P2[idx] + self.B0[idx] * (y - 1) - self.u0 * series_sum
         return p2_sum
 
     def eval_p1(self, x):
         #x = np.abs(x)
         pi_x = np.pi * x
         series_sum = np.sum(self.un * np.cos(pi_x * self.n_series))
-        p1_sum = self.P2 - self.B0 + self.u0 * np.cosh(x  / self.k) - 2 * self.B0 * series_sum
+        p1_sum = self.avg_P2 - self.avg_B0 + self.u0 * np.cosh(x  / self.avg_k) - self.u0 *  series_sum
         return p1_sum
 
     def plot_p1(self, ax, x):
         f_p1 = np.vectorize(self.eval_p1)
         p1 = f_p1(x)
-        ax.plot(x, p1, label="p1")
+        ax.plot(x, p1, label="p1an")
         return p1
 
     def plot_p2(self, ax, x, y):
         f_p2 = np.vectorize(self.eval_p2)
         p2 = f_p2(x, y)
-        ax.plot(x, p2, label="p2, y={:8.6f}".format(y))
+        ax.plot(x, p2, label="p2an, y={:8.2f}".format(y))
         return p2
+
+
 
     def form_fd_matrix(self, nx, ny):
         """
@@ -177,11 +179,15 @@ class BarrierFracture:
         k2 = self.k2
         k1 = self.k1
         sigma = self.sigma
-        #k1 = self.k1
-        #sigma = self.sigma
+        print(k2,sigma,k1)
 
         nx = int(nx/2)       # we compute only half of domain
         ny += int(ny % 2)    # Make ir even
+
+        ny_half = int(ny/2)
+        iy_dirichlet = [0, ny+2]
+        iy_bc_frac = [ny_half, ny_half+2]
+        iy_frac = ny_half + 1
 
 
         Nx = nx+1
@@ -193,91 +199,101 @@ class BarrierFracture:
         ddx = dx*dx
         ddy = dy*dy
 
-        n_dofs = Nx*(Ny+1)
+        n_dofs = Nx*(Ny+2)
         A_vals = TripletMatrix(n_dofs, n_dofs)
         b = np.zeros((n_dofs,))
-        k_frac = Ny*Nx
 
-        k=0
-        i=0
-        # Dirichlet top, bottom
-        for i  in [0, ny]:
-            k = i*Nx
-            for j in range(0, Nx):
-                A_vals.add((k, k, 1.0))
-                b[k] = self.P2
-                k += 1
-
-        # regular lines
-        for i in range(1, ny):
-            k = i * Nx
-            if i == int(ny/2):
-                k_frac_shift = Nx * int(ny / 2) + Nx
-
-                # Fracture BC, Neumman:
-                # O(dy^2) formula: (-3*u_0 + 4*u_1 - u_2) / (2*dy)
-                # A_vals.add((k, k,       sigma * (-3.0) / dx2))
-                # A_vals.add((k, k + 1,   sigma * (4.0) / dx2))
-                # A_vals.add((k, k + 2,   sigma * (-1.0) / dx2))
-
-                #k+=1
-                for j in range(0, Nx):
-
-
-                    # Neumann 2. order
-                    A_vals.add((k, k,        2* k2 * (-3.0) / dy2 - 2*sigma ))
-                    A_vals.add((k, k + k_frac_shift, 2*sigma))
-                    A_vals.add((k, k - 1*Nx,    k2 * 4 / dy2))
-                    A_vals.add((k, k - 2*Nx,    k2 * (-1) / dy2))
-                    A_vals.add((k, k + 1*Nx,    k2 * 4 / dy2))
-                    A_vals.add((k, k + 2*Nx,    k2 * (-1) / dy2))
-                    k += 1
-
-
-
-                # Fracture equation
-                k = k_frac
-                # Left zero Nemmann
-                A_vals.add((k, k, -3.0 / dx2))
-                A_vals.add((k, k + 1, 4 / dx2))
-                A_vals.add((k, k + 2, -1 / dx2))
-                k += 1
-
-                # regular points
-                for j in range(1,nx):
-                    A_vals.add((k, k, 2 * k1 / ddx + 2*sigma))
-                    A_vals.add((k, k - 1, -k1 / ddx))
-                    A_vals.add((k, k + 1, -k1 / ddx))
-                    A_vals.add((k, k - k_frac_shift, - 2*sigma))
-                    k += 1
-
-                # Right Dirichlet
-                A_vals.add((k, k, 1.0))
-                b[k] = self.P1
-                continue
+        def regular_line_2d(iy, side):
+            k = iy * Nx
 
             # left zero Neumann
             # O(dx^2) formula: (-3*u_0 + 4*u_1 - u_2) / (2*dx)
-            A_vals.add((k, k,     -3.0/dx2))
-            A_vals.add((k, k + 1,   4/dx2))
-            A_vals.add((k, k + 2, -1/dx2))
+            A_vals.add((k, k, -3.0 / dx2))
+            A_vals.add((k, k + 1, 4 / dx2))
+            A_vals.add((k, k + 2, -1 / dx2))
             k += 1
 
             # regular points
-            for j in range(1,nx):
-                A_vals.add((k, k,      2*k2/ddx + 2*k2/ddy))
-                A_vals.add((k, k-1,    -k2/ddx))
-                A_vals.add((k, k+1,    -k2/ddx))
-                A_vals.add((k, k-Nx,   -k2/ddy))
-                A_vals.add((k, k+Nx,   -k2/ddy))
+            for j in range(1, nx):
+                A_vals.add((k, k, 2 * k2[side] / ddx + 2 * k2[side] / ddy))
+                A_vals.add((k, k - 1, -k2[side] / ddx))
+                A_vals.add((k, k + 1, -k2[side] / ddx))
+                A_vals.add((k, k - Nx, -k2[side] / ddy))
+                A_vals.add((k, k + Nx, -k2[side] / ddy))
                 k += 1
 
             # right zero Neumann
             # O(dx^2) formula: (-3*u_0 + 4*u_1 - u_2) / (2*dx)
-            A_vals.add((k, k,     -3.0/dx2))
-            A_vals.add((k, k - 1,   4/dx2))
-            A_vals.add((k, k - 2, -1/dx2))
+            A_vals.add((k, k, -3.0 / dx2))
+            A_vals.add((k, k - 1, 4 / dx2))
+            A_vals.add((k, k - 2, -1 / dx2))
             k += 1
+
+        ###########################
+
+        # Dirichlet top, bottom
+        for side  in [0, 1]:   # top, bottom
+            k = iy_dirichlet[side]*Nx
+            for j in range(0, Nx):
+                A_vals.add((k, k, 1.0))
+                b[k] = self.P2[side]
+                k += 1
+
+        # regular lines top
+        for iy in range(iy_dirichlet[0]+1, iy_bc_frac[0]):
+            regular_line_2d(iy, side=0)
+
+        # regular lines bottom
+        for iy in range(iy_bc_frac[1]+1, iy_dirichlet[1]):
+            regular_line_2d(iy, side=1)
+
+
+        k_frac_shift = [Nx, -Nx]
+
+        # Top and bottom BC with fracture
+        for side in [0,1]:
+            k = iy_bc_frac[side] * Nx
+            ks = k_frac_shift[side]
+
+            # Fracture BC, Neumman:
+            # O(dy^2) formula: (-3*u_0 + 4*u_1 - u_2) / (2*dy)
+            # A_vals.add((k, k,       sigma * (-3.0) / dx2))
+            # A_vals.add((k, k + 1,   sigma * (4.0) / dx2))
+            # A_vals.add((k, k + 2,   sigma * (-1.0) / dx2))
+
+                    #k+=1
+            for ix in range(0, Nx):
+                # Neumann 2. order
+                A_vals.add((k, k,           k2[side] * (-3.0) / dy2 - sigma[side] ))
+                A_vals.add((k, k + ks,      +sigma[side]))
+                A_vals.add((k, k - 1*ks,    k2[side] * 4 / dy2))
+                A_vals.add((k, k - 2*ks,    k2[side] * (-1) / dy2))
+                #A_vals.add((k, k + 1*Nx,    k2[side] * 4 / dy2))
+                #A_vals.add((k, k + 2*Nx,    k2[side] * (-1) / dy2))
+                k += 1
+
+        # Fracture equation
+        k = iy_frac * Nx
+        # Left zero Nemmann
+        A_vals.add((k, k, -3.0 / dx2))
+        A_vals.add((k, k + 1, 4 / dx2))
+        A_vals.add((k, k + 2, -1 / dx2))
+        k += 1
+
+        # regular points
+        print(ddx)
+        for j in range(1,nx):
+            A_vals.add((k, k, 2 * k1 / ddx + sigma[0] + sigma[1]))
+            A_vals.add((k, k - 1, -k1 / ddx))
+            A_vals.add((k, k + 1, -k1 / ddx))
+            A_vals.add((k, k - Nx, - sigma[0]))
+            A_vals.add((k, k + Nx, - sigma[1]))
+            k += 1
+
+        # Right Dirichlet
+        A_vals.add((k, k, 1.0))
+        b[k] = self.P1
+
         return (A_vals.make_csr(), b)
 
 
@@ -288,55 +304,116 @@ class BarrierFracture:
         self.dof_values = sp_la.spsolve(A, b)
 
         # dof_values - have dofs only for right side
+        ny_half = int(ny/2)
+        Ny = ny + 1
+        Nx = int(nx/2) + 1
         x = np.linspace(-1, 1, (nx+1))
-        y = np.linspace(-1, 1, (ny+1))
-        nx_2d = int(nx/2) + 1
-        ny_2d = (ny + 1)
-        frac_start = nx_2d * ny_2d
-        right_side = self.dof_values[: frac_start ].reshape((ny_2d, nx_2d))
-        left_side = right_side[:, -1: 0: -1]
-        p2_mat = np.concatenate((left_side, right_side), axis = 1)
+        y = np.empty(Ny+1, dtype=float)
+        y[0:ny_half + 1] = np.linspace(1, 0, (ny_half + 1))
+        y[ny_half + 1:] = np.linspace(0, -1, (ny_half + 1))
+        y_epsilon = 1e-16
+        y[ny_half] = y_epsilon
+        y[ny_half+1] = -y_epsilon
 
-        r_vec = self.dof_values[frac_start:]
+        iy_2d = np.concatenate( (np.arange(0, ny_half+1, 1),
+                                 np.arange(ny_half+2, Ny + 2, 1)) )
+        iy_1d = ny_half+1
+
+        value_matrix = self.dof_values.reshape((ny+3, Nx))
+        right_side_2d = value_matrix[iy_2d, :]
+        left_side_2d = right_side_2d[:, -1: 0: -1]
+        p2_mat = np.concatenate((left_side_2d, right_side_2d), axis = 1)
+
+        r_vec = value_matrix[iy_1d, :]
         l_vec = r_vec[-1: 0: -1]
         p1_vec = np.concatenate( (l_vec, r_vec) )
 
         return (x,y, p1_vec, p2_mat)
 
 
+def add_text(ax, data, text, shift):
+    y = data[int(len(data)/2)]
+    ax.text(0.0, y+shift, text, horizontalalignment='center')
 
 
 
-def plot_test():
-    ac = ContinousFracture(k1=0.1, k2=1, sigma=1, P1=5, P2=10, n_terms=3)
 
-    #ac = BurdaFrac(k1=0.1, k2=1, sigma=3, P1=5, P2=10, n_terms=10000)
-    nx,  ny = 100, 100
-    x, y, p1, p2 = ac.solve_fd(nx, ny)
+def plot_solution():
+    """
+    Plot both analytical and FD solution. and errors
+    :return:
+    """
+    #ac = BarrierFracture(k1=0.5, k2=(5,2), sigma=(20,10), P1=0, P2=(10, -10), n_terms=1000)
+    sigma = k2 = 0.01
+    sigma_values = (3*sigma ** 0.5, sigma)
+    k2_values = (k2, k2**0.5 )
 
-    fig = plt.figure(figsize=(15, 5))
+    ac = BarrierFracture(k1=1, k2=k2_values, sigma=sigma_values, P1=0, P2=(10, -10), n_terms=1000)
+
+    nx,  ny = 200, 200
+    x, y, p1_fd, p2_fd = ac.solve_fd(nx, ny)
+
+    fig = plt.figure(figsize=(13, 5))
     ax = fig.add_subplot(121)
     ax_err = fig.add_subplot(122)
 
-    ax.plot(x, p1, '.', label="p1fd")
-    ac_p1 = ac.plot_p1(ax, x)
-    ax_err.plot(x, p1 - ac_p1, label="p1-a_p1")
 
-    y_cuts = [0, 0.2, 0.5, 0.8, 1]
+
+
+    norm = matplotlib.colors.Normalize(-1.3, 1.3)
+    #cmap_an = matplotlib.cm.get_cmap('autumn')
+    cmap_fd = matplotlib.cm.get_cmap('coolwarm')
+
+    y_cuts = [1, 0.5, 1e-8, -1e-8, -0.5, -1]
     for y in y_cuts:
-        iy = int(y*ny/2)
-        y_true = 2.0/ny * iy
-        iy = int(ny/2) - iy
-        p2_ycut = p2[iy, :]
-        ax.plot(x, p2_ycut, '.', label="p2fd, y={}".format(y_true))
-        ac_p2 = ac.plot_p2(ax, x, y_true)
+        sgn = 1 if y>0 else -1
 
-        ax_err.plot(x, p2_ycut - ac_p2, label="p2-a_p2, y={}".format(y))
+        iy = int(abs(y)*ny/2)
+        y_true = sgn*2.0/ny * iy + sgn*1e-12
+        y_color = sgn*2.0/ny * iy + sgn*0.3
+        iy = int(ny/2) - sgn*iy
+        if sgn < 0:
+            iy += 1
+
+        p2_ycut = p2_fd[iy, :]
+
+        p2_plt, = ax.plot(x, p2_ycut, linewidth=3, color="blue", label="p2, fd, y={:4.2f}".format(y_true))
+        #fd_plots.append(p2_plt)
+        p2_an = ac.vec_eval_p2(x, y_true)
+        p2_plt, = ax.plot(x, p2_an, color="orange", label="p2, an, y={:4.2f}".format(y_true))
+        #an_plots.append(p2_plt)
+        add_text(ax, p2_ycut, "p2, y={:4.2f}".format(y_true), 0.1)
+
+        ax_err.plot(x, p2_ycut - p2_an, color=cmap_fd(norm(y_color)), label="p2_diff, y={:4.2f}".format(y_true))
+
+    #fd_plots = []
+    #an_plots = []
+    p1_plt, = ax.plot(x, p1_fd, linewidth=3, color='blue', label="p1, fd")
+
+    #fd_plots.append(p1_plt)
+    p1_an = ac.vec_eval_p1(x)
+    p1_plt, = ax.plot(x, p1_an, color='orange', label="p1, an")
+    #an_plots.append(p1_plt)
+    add_text(ax, p1_fd, "p1", -0.3)
+
+    ax_err.plot(x, p1_fd - p1_an, color='green', label="p1_diff")
+
+    ax.set_xlabel("x")
+    p_list = [ac.P1, ac.P2[0], ac.P2[1]]
+    ax.set_ylim( (min(p_list)-0.5, 1.1*max(p_list)+0.5) )
+
+    #ax_err.legend(bbox_to_anchor=(1.05, 1), loc=0, borderaxespad=0.)
+    ax_err.legend(loc=9)
+    ax_err.set_xlabel("x")
+    ax_err.set_ylabel("difference")
+    ax_err.ticklabel_format(style='sci', scilimits=(0,0))
 
     #y = (ac.P1 - ac.P2) * np.cosh( x/ac.k1) / np.cosh(1/ac.k1) + ac.P2
     #ax.plot(x, y, label="ref")
 
-    ax_err.legend(bbox_to_anchor=(1.05, 1), loc=0, borderaxespad=0.)
+    #all_plots = fd_plots + an_plots
+    #labels = [ plot.get_label() for plot in all_plots]
+    #ax.legend(all_plots, labels, bbox_to_anchor=(-.05, 1), loc=0, borderaxespad=0.)
 
     #stripes=[0.0001, 0.00033, 0.001, 0.0033, 0.01, 0.033, 0.1, 0.33, 1]
     #ac.plot_analytical()
@@ -357,9 +434,10 @@ def plot_test():
     #
     # ax_right.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     # ax_right.set_xlabel("Y direction")
-    ax.legend(bbox_to_anchor=(-.05, 1), loc=0, borderaxespad=0.)
-    plt.show()
 
+    #plt.savefig("barrier_solution.pdf", bbox_inches='tight')
+    plt.show()
+    return
     # compute approx of -k2*\Lapl p_2 for analytical sol.
 
     fig = plt.figure()
@@ -400,12 +478,21 @@ def plot_test():
 
 def plot_p2_field(x, y, p2_diff):
     fig = plt.figure(figsize=(15, 5))
-    ax1 = fig.add_subplot(121)
-    ax2 = fig.add_subplot(122)
+    ax1 = fig.add_subplot(111)
+    #ax2 = fig.add_subplot(122)
 
-    CS = ax1.contourf(x, y, p2_diff)
-    cbar = plt.colorbar(CS)
+    #CS = ax1.contourf(x, y, np.abs(p2_diff), 10, locator=matplotlib.ticker.LogLocator())
+    grid = np.abs(p2_diff)
+    imgplot = ax1.imshow(grid,
+                         norm=matplotlib.colors.LogNorm(vmin=np.min(grid), vmax=np.max(grid)),
+                         extent= (x[0],x[-1], y[-1], y[0]))
+    #ax1.set_xticks(x)
+    #ax1.set_yticks(y)
+
+    cbar = plt.colorbar(imgplot)
     cbar.ax.set_ylabel('diff')
+    plt.show()
+
     # Add the contour line levels to the colorbar
     #cbar.add_lines(CS2)
 
@@ -414,13 +501,13 @@ def plot_p2_field(x, y, p2_diff):
     # ax2.plot(y, p2_diff[:, 1], label='0.01')
     # ax2.plot(y, p2_diff[:, -2], label='0.99')
     # ax2.legend()
-    return (ax1, ax2)
-
-    plt.show()
+    #return (ax1, ax2)
 
 
-def compute_error(n_terms, fd_n, k1, sigma, y_band=True):
-    ac = ContinousFracture(k1=k1, k2=1, sigma=sigma, P1=5, P2=10, n_terms=n_terms)
+
+
+def compute_error(n_terms, fd_n, k2, sigma, y_band=True):
+    ac = BarrierFracture(k1=1, k2=k2, sigma=sigma, P1=0, P2=(10, -10), n_terms=n_terms)
     nx,  ny = fd_n, fd_n
     x, y, p1, p2 = ac.solve_fd(nx, ny)
 
@@ -428,54 +515,53 @@ def compute_error(n_terms, fd_n, k1, sigma, y_band=True):
     p1_l2 = la.norm( p1_diff) * np.sqrt(2.0 / nx)
 
     if y_band:
-        band = np.arange(int(ny/2*0.9), int(ny/2*1.1), 1)
-        print(fd_n, len(band), len(band)*len(x)*2.0/ nx * 2.0/ ny)
+        band = np.abs(y) < 0.5
     else:
         band = np.arange(0, len(y), 1)
     an_p2_band = ac.vec_eval_p2(x[None, :], y[band, None])
     p2_diff = an_p2_band - p2[band, :]
+    #plot_p2_field(x, y[band], p2_diff)
 
     p2_l2 = la.norm(p2_diff.ravel()) * np.sqrt(2.0/ nx * 2.0/ ny)
 
     return p1_l2, p2_l2
 
-    # fig = plt.figure(figsize=(15, 5))
-    # ax1 = fig.add_subplot(121)
-    # ax2 = fig.add_subplot(122)
+    fig = plt.figure(figsize=(15, 5))
+    #ax1 = fig.add_subplot(121)
+    ax2 = fig.add_subplot(111)
+
+    # p2 BC condtion for Analytical solution on X axis
+    # p2_dy = np.empty_like(x)
+    # p12_diff = np.empty_like(x)
+    # for i, xv in enumerate(x):
+    #     d = 1e-6
+    #     p20 = ac.vec_eval_p2(xv, 0)
+    #     p2d = ac.vec_eval_p2(xv, d)
+    #     p2_dy[i] = ac.k2*(p2d - p20) / d
+    #     p12_diff[i] = ac.sigma*(p20 - ac.vec_eval_p1(xv))
+    # ax1.plot(x, p2_dy, label = "dp2/dy(x,0)")
+    # ax1.plot(x, p12_diff, label = "diff")
+    # ax1.legend()
+
+    # p2 error countour plot
+    #CS = ax1.contourf(x, y, p2_diff)
+    #cbar = plt.colorbar(CS)
+    #cbar.ax.set_ylabel('diff')
+
+    # Error lines for constant x
+    for ix in [int(0.5*nx), int(0.8*nx), int(nx-1)]:
+        ax2.plot(y[band], p2_diff[:, ix], label='ix')
+    ax2.legend()
+
+
+    # Analytical and FD solution lines for constant X
+    # ax2.plot(y, an_p2_band[:, int(nx/2)], label='an, x=0')
+    # ax2.plot(y, an_p2_band[:, 1], label='an, x=0.01')
+    # ax2.plot(y, an_p2_band[:, -2], label='an, x=0.99')
     #
-    # # p2 BC condtion for Analytical solution on X axis
-    # # p2_dy = np.empty_like(x)
-    # # p12_diff = np.empty_like(x)
-    # # for i, xv in enumerate(x):
-    # #     d = 1e-6
-    # #     p20 = ac.vec_eval_p2(xv, 0)
-    # #     p2d = ac.vec_eval_p2(xv, d)
-    # #     p2_dy[i] = ac.k2*(p2d - p20) / d
-    # #     p12_diff[i] = ac.sigma*(p20 - ac.vec_eval_p1(xv))
-    # # ax1.plot(x, p2_dy, label = "dp2/dy(x,0)")
-    # # ax1.plot(x, p12_diff, label = "diff")
-    # # ax1.legend()
-    #
-    # # p2 error countour plot
-    # CS = ax1.contourf(x, y, p2_diff)
-    # cbar = plt.colorbar(CS)
-    # cbar.ax.set_ylabel('diff')
-    #
-    # # Error lines for constant x
-    # ax2.plot(y, p2_diff[:, int(nx/2)], label='center')
-    # ax2.plot(y, p2_diff[:, 1], label='0.01')
-    # ax2.plot(y, p2_diff[:, -2], label='0.99')
-    # ax2.legend()
-    #
-    #
-    # # Analytical and FD solution lines for constant X
-    # # ax2.plot(y, an_p2_band[:, int(nx/2)], label='an, x=0')
-    # # ax2.plot(y, an_p2_band[:, 1], label='an, x=0.01')
-    # # ax2.plot(y, an_p2_band[:, -2], label='an, x=0.99')
-    # #
-    # # ax2.plot(y, p2[:, int(nx/2)], label='fd, x=0')
-    # # ax2.plot(y, p2[:, 1], label='fd, x=0.01')
-    # # ax2.plot(y, p2[:, -2], label='fd, x=0.99')
+    # ax2.plot(y, p2[:, int(nx/2)], label='fd, x=0')
+    # ax2.plot(y, p2[:, 1], label='fd, x=0.01')
+    # ax2.plot(y, p2[:, -2], label='fd, x=0.99')
 
 
 
@@ -532,7 +618,7 @@ def plot_decay(table, n_an, n_fd):
     plt.setp(ax_fd1.get_xticklabels(), visible=False)
     ax_fd1.legend(loc=3)
     ax_fd2.legend(loc=3)
-    plt.savefig("continuous_convergency.pdf")
+    plt.savefig("barrier_convergency.pdf")
     plt.show()
 
 
@@ -549,22 +635,184 @@ def error_decay(plot = False):
 
     # n_terms_list =  [10, 100, 1000, 10000]
     # nx_list = [10, 20, 40, 80, 160, 320]
-    n_terms_list =  [10, 50, 100, 200, 500]
-    nx_list = [20, 40, 80, 160, 320, 640, 1280]
+    #n_terms_list =  [8, 16, 32, 64, 128]
+    n_terms_list = [128]
+    nx_list = [20, 40, 80, 160, 320]#, 640, 1280]
 
 
     err_table = np.empty((len(n_terms_list), len(nx_list), 2))
     for i, n_terms in enumerate(n_terms_list):
         for j, nx in enumerate(nx_list):
-            err_table[i,j,:] = compute_error(n_terms, nx, k1, sigma)
+            err_table[i,j,:] = compute_error(n_terms, nx, (1000,3000), (100, 4000))
 
     plot_decay(err_table, n_terms_list, nx_list)
 
 
 
-#p1_l2, p2_l2, p1_diff, p2_diff = compute_error(100, 100, 0.01, 1, y_band=False)
+def plot_analytical_eq():
+    """
+    Plot error when analytical solution is plugged into selected equations.
+    :return:
+    """
+    ac = BarrierFracture(k1=1, k2=(1, 1), sigma=(100, 100), P1=0, P2=(10, 10), n_terms=1000)
+
+    #######################################
+    # Error in P1 eq, and BC+ BC-
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    X = np.linspace(0,1,50)
+    p1_err = np.empty_like(X)
+    bc_err = np.zeros( (2, len(X)) )
+    d = 1e-4
+    for i, x in enumerate(X):
+        p1_1 = ac.vec_eval_p1(x)
+        p1_0 = ac.vec_eval_p1(x - d)
+        p1_2 = ac.vec_eval_p1(x + d)
+        p2_0 = ac.vec_eval_p2(x, 1e-16)
+        p2_1 = ac.vec_eval_p2(x, -1e-16)
+        p1_err[i] = -ac.k1 * (2* p1_1 - p1_0 - p1_2) / d/ d - ac.sigma[0] * (p1_1 - p2_0) - ac.sigma[1] * (p1_1 - p2_1)
+
+        p2_00 = ac.vec_eval_p2(x, d)
+        p2_11 = ac.vec_eval_p2(x, -d)
+        bc_err[0, i] = ac.k2[0] * ( p2_00 - p2_0) / d  + ac.sigma[0] * (p1_1 - p2_0)
+        bc_err[1, i] = ac.k2[1] * ( p2_11 - p2_1) / d  + ac.sigma[1] * (p1_1 - p2_1)
+
+
+    ax.plot(X, p1_err, label="p1_err")
+    ax.plot(X, bc_err[0], label="bc_err_top")
+    ax.plot(X, bc_err[1], label="bc_err_top")
+    ax.legend()
+    plt.show()
+
+    return
+    #########################################
+    # compute approx of -k2*\Lapl p_2 for analytical sol.
+    fig = plt.figure()
+    #ax = fig.add_subplot(111, projection='3d')
+    ax = fig.add_subplot(111)
+
+    d = 1e-7
+    grid = np.linspace(0,1,20)
+    X, Y = np.meshgrid(grid, grid[1:])
+    Z = np.empty_like(X)
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            x = X[i,j]
+            y = Y[i, j]
+            p2_11 = ac.vec_eval_p2(x,y)
+            p2_21 = ac.vec_eval_p2(x + d, y)
+            p2_01 = ac.vec_eval_p2(x - d, y)
+            p2_12 = ac.vec_eval_p2(x, y + d)
+            p2_10 = ac.vec_eval_p2(x, y - d)
+
+            Z[i,j] = (4* p2_11 - p2_21 - p2_01 - p2_10 - p2_12) / d /d
+    #ax.plot_wireframe(X, Y, p2, rstride=10, cstride=10)
+
+    surf = ax.contourf(X, Y, np.abs(Z), locator=matplotlib.ticker.LogLocator(), cmap=cm.coolwarm,
+                           linewidth=0, antialiased=False)
+
+
+
+    #ax.zaxis.set_major_locator(LinearLocator(10))
+    #ax.zaxis.set_major_formatter(FormatStrFormatter('%.02f'))
+
+    # Add a color bar which maps values to colors.
+    fig.colorbar(surf, shrink=0.5, aspect=5)
+
+    plt.show()
+
+
+
+def error_decay_parameter_study():
+    sigma_bounds = np.arange(-2, 4, 0.25)
+    k2_bounds = np.arange(-2, 4, 0.25)
+    sigma_list = (sigma_bounds[0:-1] + sigma_bounds[1:])/2
+    k2_list = (k2_bounds[0:-1] + k2_bounds[1:]) / 2
+    fit_table = np.empty( (len(sigma_list), len(k2_list), 2, 2))
+    for isg, sigma_log in enumerate(sigma_list):
+        for ik2, k2_log in enumerate(k2_list):
+            sigma = 10.0**sigma_log
+            k2 = 10.0**k2_log
+            nx_list = [20, 40, 80, 160, 320]
+            err_table = np.empty( (len(nx_list), 2) )
+            for inx, nx in enumerate(nx_list):
+                sigma_values = (3*sigma**0.5, sigma )
+                k2_values = (k2, k2**0.5)
+                err_table[inx, :] = compute_error(100, nx, k2_values, sigma_values, y_band=0.1)
+            fit_table[isg, ik2,:, :] = np.polyfit(np.log(np.array(nx_list)), np.log2(err_table[:,:]), deg = 1)
+
+    fig = plt.figure(figsize=(16, 3))
+
+    ax = fig.add_subplot(141)
+    ax.set_ylabel("$k_2$")
+    ax_list =  [
+        ax,
+        fig.add_subplot(142, sharey = ax),
+        fig.add_subplot(143, sharey = ax),
+        fig.add_subplot(144, sharey = ax)
+    ]
+    im_list =[]
+    X,Y = np.meshgrid(10.0**sigma_bounds, 10.0**k2_bounds)
+
+    cm = [ matplotlib.cm.get_cmap('plasma'), matplotlib.cm.get_cmap('viridis') ]
+    for i_deg in [0, 1]:
+        for i_dim in [0, 1]:
+            ii = i_dim +  2*i_deg
+            ax = ax_list[ii]
+            #ax.axis('equal')
+            im = ax.pcolormesh(X, Y, -fit_table[:,:, i_deg, i_dim], cmap=cm[i_deg])
+            ax.set_xscale('log')
+            ax.set_yscale('log')
+            im_list.append(im)
+            #ax.set_xticks(np.arange(0, len(sigma_list), 1))
+            #ax.set_yticks(np.arange(0, len(k2_list), 1))
+            #ax.set_xticklabels(10.0 ** sigma_list)
+            #ax.set_yticklabels(10.0 ** k2_list)
+            #ax.ticklabel_format(style='sci', scilimits=(0, 0))
+
+
+            ax.tick_params(
+                axis='both',  # changes apply to the x-axis
+                which='minor',  # both major and minor ticks are affected
+                left='off',
+                bottom='off')  # labels along the bottom edge are off
+
+            if ii > 0:
+                ax.tick_params(
+                    axis='y',  # changes apply to the x-axis
+                    which='both',  # both major and minor ticks are affected
+                    labelleft='off')  # labels along the bottom edge are off
+
+
+    ax_list[0].set_xlabel("$\sigma$, order, p1 ")
+    ax_list[1].set_xlabel("$\sigma$, order, p2 ")
+    ax_list[2].set_xlabel("$\sigma$, abs_err, p1 ")
+    ax_list[3].set_xlabel("$\sigma$, abs_err, p2 ")
+    fig.colorbar(im_list[0], ax=ax_list[:2])
+    fig.colorbar(im_list[2], ax=ax_list[2:])
+
+    # Adding the colorbar
+    # cb_ax = fig.add_axes([0.1, 0.1, 0.03, 0.8])  # This is the position for the colorbar
+    # fig.colorbar(im_list[0], cax=cb_ax)
+    #
+    # cb_ax = fig.add_axes([3, 0.1, 0.03, 0.8])  # This is the position for the colorbar
+    # fig.colorbar(im_list[2], cax=cb_ax)
+
+    #plt.tight_layout()
+    #plt.gcf().subplots_adjust(bottom=0.15)
+    plt.savefig("barrier_conv_rate.pdf", bbox_inches='tight')
+    plt.show()
+
+
+
+
+
 
 #error_decay()
 
-#plot_test()
+#plot_solution()
 
+#plot_analytical_eq()
+
+
+error_decay_parameter_study()

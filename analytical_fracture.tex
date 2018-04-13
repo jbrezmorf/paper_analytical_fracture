@@ -38,11 +38,12 @@ Pavel Burda
 \maketitle
 
 \begin{abstract}
-We consider a model of the flow in fractured porous media based on the dual continuum approach and 
-explicit description of the fracture zones by lower-dimensional objects. For this model, we 
-present the mixed-hybrid formulation and discretization using Raviart-Thomas finite elements. 
-In particular, we present two new methods for the discrete coupling between equations on meshes of different dimensions
-with arbitrary overlapping. Convergence properties of these methods are demonstrated by numerical tests.
+An analytical solution to a test Darcy flow problem on a square domain with a single horizontal fracture is
+derived in terms of Fourier series. Distinct pressure variables $p_1$ and $p_2$ are considered for 
+the fracture and the matrix respectively coupled together by a Robin type condition. 
+Two cases are treated: the conductive fracture with $p_2$ continuous and symmetric about the fracture and the barrier fracture,
+generalization with separate $p_2$ and parameters for upper and lower part. The analytical solution was verified against
+the numerical solution using second order finite differences. 
 \end{abstract}
 
 %\begin{keywords} 
@@ -63,26 +64,36 @@ Fractures, cracks, fissures, faults and other discontinuities are ubiquitous in 
 Fractures present a challenge for subsurface water flow modeling as they have small volume but large permeability with
 potentially large impact on the pressure and velocity fields. Alternatively the filled fractures can behave as barriers. 
 
-Fractures occurs on wide range of scales. The small scale fractures could be homogenized, while the scales comparable to 
-the dimensions of a computational domain should be captured explicitly.
+Fractures occurs on wide range of scales. Small scale fractures could be homogenized, while fractures with scales 
+comparable to the dimensions of a domain should be captured explicitly. The large scale fractures are still very thin and 
+a direct discretization with any mesh based method (FE, FV, DG, \dots) requires high level of refinement which become 
+costly especially for large number of fractures. A solution to this problem is usage of a {\it mixed mesh} combining 
+the elements of different dimension. It has been shown that for the advection-diffusion equation the original 3d (or 2d) 
+problem can be approximated by the system of 3d-2d (or 2d-1d) problems coupled by a Robin type condition (see e.g. \cite{Martin2005},
+, \cite{fumagalli_numerical_2011}, \cite{brezina_analysis_2015}). 
 
+For the purpose of testing implementations of the mixed mesh approach in combination with different numerical methods
+it is necessary to have a suitable test problem with known solution. A common approach is to plug any function into the equations
+and prescribe resulting right hand side. This approach is convenient to test correctness of the implementation but often turns out to
+do not capture peculiarities of the real solution and thus may be unsuitable for tests of convergence of the used method. 
 
-
-small cross-section area. Finally, we obtain system of equations on the domains of different dimension, coupled through the boundary 
-conditions. This approach has been proposed by several authors, see e.g. \cite{reichenberger_mixed-dimensional_2006} or
-homogenization arguments in \cite{martin_modeling_2005}.  
-
-Even after this simplification, it could be difficult to obtain the mesh where the elements on the fractures match the sides of 
-the elements of a surrounding continuum. The aim of this paper is to present two mortar-like methods for mixed-hybrid formulation
-that relax this compatibility condition. Since these methods can not capture the jump in the pressure over the fractures, we have
-to assume continuous pressure in our model. This is not completely unrealistic, since such a model can be viewed 
-as a dual continuum model
-in spirit of Gerke and Genuchten \cite{GerkeGenuchten1993a} where the fracture zone is explicitly localized. 
+To this end we propose a test Darcy flow problem consisting of the square domain (matrix) and the single horizontal fracture 
+cutting the domain into upper and lower part.  
+Two cases are considered: the {\it conductive fracture} and the more general {\it barrier fracture}.
+The conductive fracture assumes symmetry about the fracture yet keeping separate pressure for the matrix and for the fracture. 
+This case is relatively simple to solve but have very limited practical usage.
+The barrier fracture case is a generalization where the problem parameters as well as the matrix pressure ere treated independently f
+or the upper and the lower part of the matrix domain. Both problems are introduced in Section \ref{sec:setting}.
+The solution to the conductive fracture problem is derived in Section \ref{sec:continuous_frac} the same approach with necessary modifications and extensions
+is used to derive the solution to the barrier fracture problem in Section \ref{sec:barrier_frac}. In Section \ref{sec:verify}, 
+both solutions are verified against a numerical solution provided by the second order finite difference scheme on a regular grid. 
+Conclusions are summarized in the final Section \ref{sec:conclusion} 
 
 
 
 
 \section{Test problems}
+\label{sec:setting}
 Main result of the paper is derivation of the strong analytical solution for two test problems with coupling between continuum and a fracture.
 A Darcy flow is considered  on a square 2D domain $\Omega_2 = (-1,1)\times(-1,1)$
 with a horizontal fracture $\Omega_1 = { (x,0) : x\in (-1,1)}$. The fracture splits $\Omega_2$ into upper and 
@@ -96,7 +107,7 @@ The stationary Darcy flow is driven by the same equation on all three domains:
   \label{eq:Darcy_common_c}
 \end{align}
 Where $p_d$, $d=1,2$ is the pressure and $f$ is the communication term that will be specified later. 
-We consider constant conductivities $k_2$, $k_1$ on $\Omega_2$ and $\Omega_1$, respectively.
+We consider positive constant conductivities $k_2$, $k_1$ on $\Omega_2$ and $\Omega_1$, respectively.
 
 The homogeneous Neumann condition is set on the left and the right side of $\Omega_2$,
 while the Dirichlet condition is set on the top and bottom and at the tips of the fracture.
@@ -116,7 +127,7 @@ Then we prescribe following boundary conditions
 \end{align}
 
 In order to complete the problem we must prescribe boundary conditions on the fracture and specify the source term $f$. Here we 
-distinguish two cases: {\emph a conductive barrier} and {\emph a barrier fracture}.
+distinguish two cases: the \emph{conductive fracture} and the \emph{barrier fracture}.
 
 
 {\bf Conductive fracture.} In this case we assume a fracture with similar or higher conductivity then in the continuum, $k_1 \ge k_2$.
@@ -129,13 +140,13 @@ We set:
   f(x) &= 2\sigma (p_2(x,0) - p_1(x)),   &&
   \label{eq:c_coupling_c}
 \end{align}
-where $\sigma$ is a coupling parameter, usually $\sigma \approx k_1 / \delta$ with $\delta$ standing for the fracture cross-section. 
+where $\sigma \ge 0$ is a coupling parameter, usually $\sigma \approx k_1 / \delta$ with $\delta$ standing for the fracture cross-section. 
 Solution of this case is discussed in Section \ref{sec:continuous_frac}.
 
 
 
 {\bf Barrier fracture.} Other case is a fracture with significantly smaller conductivity compared to the surrounding continuum. In this case
-the pressure $p_2$ is discontinuous across the fracture and two sides of the fracture acts independently. We also 
+the pressure $p_2$ is discontinuous across the fracture and we have two independent boundare conditions for each side of the fracture. We also 
 distinguish conductivities $k_2^+$, $k_2^-$ and boundary pressure $P_2^+$, $P_2^-$ for the upper and lower domains $\Omega_2^+$, $\Omega_2^-$, 
 respectively. The coupling on the fracture is prescribed by the boundary conditions:
 \begin{align}
@@ -150,8 +161,9 @@ with $\Gamma^{+}$ and $\Gamma^{-}$ denoting boundary of $\Omega_2^+$ and $\Omega
 The communication term is:
 \begin{equation}
   \label{eq:coupling_barrier}
-  f(x) = f^+(x) + f^-(x),\quad f^{+/-} = \sigma^{+/-} (p^{+/-}_2(x,0) - p_1(x)).
+  f(x) = f^+(x) + f^-(x),\quad f^{+/-} = \sigma^{+/-} (p^{+/-}_2(x,0) - p_1(x)),
 \end{equation}
+where $\sigma^+$ and $\sigma^-$ are positive coupling parameters for uppar and lower side of ther fracture respectively. 
 Solution to this system is discussed in Section \ref{sec:barrier_frac}. 
 
 \section{Conductive fracture }
@@ -159,7 +171,7 @@ Solution to this system is discussed in Section \ref{sec:barrier_frac}.
 We shall derive an analytical solution to the system $(\ref{eq:Darcy_common} - \ref{eq:bc_1})$ with the coupling conditions 
 $(\ref{eq:c_coupling_a} - \ref{eq:c_coupling_c})$. Symmetry of the problem in 
 both $x$ and $y$ direction allows us to solve equivalent reduced problem on $\widetilde\Omega_2=(0,1)\times(0,1)$ and  
-$\widetilde\Omega_1$. We impose the symmetry in $x$ direction by homegoenous Neumann condition at $x=0$. 
+$\widetilde\Omega_1$. We impose the symmetry in $x$ direction by homogeneous Neumann condition at $x=0$. 
 All equations are preserved with exception of the half flux on $\Gamma^+$. The equivalent system  reads:
 \begin{align}
     \label{eq:cc_darcy_2d}
@@ -189,15 +201,15 @@ for $y \in (0, 1)$ and finally
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% PROPOSITION 1
 \begin{prop}
 \label{proposition_continuous}
-The solution $p_1(x)$ and $p_2(x,y)$ to the system $(\ref{eq:cc_darcy_2d} - \ref{eq:cc_bc_1})$
-can be expressed in from of Fourier series:
+Let the real parameters $P_2$, $P_2$, $k_1>0$, $k_2>0$, $\sigma\ge0$ be given. Then the solution $p_1(x)$ and $p_2(x,y)$ to the system 
+$(\ref{eq:cc_darcy_2d} - \ref{eq:cc_bc_1})$ can be expressed in from of Fourier series:
 \begin{equation}
     \label{eq:p2_series}
     p_2(x,y) = P_2 + B_0(y-1) -2B_0 \sum_{n=1}^\infty a_n \cos(\pi n x) {\rm sinh} \big(\pi n(1-y)\big)  \ \ ,
 \end{equation}
 %
 \begin{equation}
-    \label{eq:p2_series}
+    \label{eq:p1_series}
     p_1(x) = P_2-B_0 +u_0 \cosh(x/k) -2B_0 \sum_{n=1}^\infty  u_n \cos(\pi n x) 
 \end{equation}
 
@@ -223,9 +235,6 @@ and use following coefficients:
     u_n = \frac{a_n \sinh(n \pi)}{1 + (k n \pi)^2}, 
 \end{equation}
 
-
-
-
 and constants:
 \begin{equation}
      \label{eq:b0}
@@ -238,10 +247,12 @@ and constants:
 
 \end{prop}
 
-We shall apply the Fourier method \cite{??}, starting with separation of variables for the equation \eqref{eq:cc_darcy_2d}.  
 
-\subsection{\bf Fourier method for 2D equation}
+\subsection{\bf Separation of variables for 2D equation}
 \label{sec:p2_conductive}
+
+We shall apply the separation of variables  (see e.g. \cite{Evans1998}) to the equation \eqref{eq:cc_darcy_2d}.  
+
 
 Considering a solution in form:
 \begin{equation}
@@ -258,7 +269,7 @@ we get possible solutions $X(x)$ in the form:
     \label{eq:general_x}
     X_n(x) = \tilde A_n + \tilde B_n \cos (n\pi x)\qquad \text{ for }n=0,1, \dots
 \end{equation}
-where $\tilde A_n$, $\tilde B_n$ are arbitrary real constants and $L$ is quantizied to values:
+where $\tilde A_n$, $\tilde B_n$ are arbitrary real constants and $L$ is quantized to values:
 \[
     L= - n^2 \pi^2.
 \]
@@ -278,7 +289,7 @@ Combining \eqref{eq:sep_vars}, \eqref{eq:general_x}, \eqref{eq:general_y} we can
     p_2(x, y) = A_0 + B_0 y + \sum ^{\infty}_{n=1} \big(C_n + \cos (n\pi x)\big) 
             \frac{1}{2}\big(A_n e^{n\pi (y-1)} + B_n e^{-n\pi (y-1)}\big).
 \end{equation}
-Then the Dirichelt condition $(\ref{eq:cc_bc_x}a)$ yields:
+Then the Dirichlet condition $(\ref{eq:cc_bc_x}a)$ yields:
 \[
     P_2 = A_0 + B_0 + \sum ^{\infty}_{n=1} \big(C_n + \cos (n\pi x)\big) 
             \frac{A_n  + B_n}{2}.
@@ -312,7 +323,7 @@ is
 \]
 Using linearity of the equation we obtain the general form of $p_1$ as:
 \begin {equation}
-    \label{eq:p1_series}        
+    \label{eq:p1_general_sol}        
     p_1(x) = c^+ e^{x/k} + c^- e^{-x/k} + P_2 - B_0 
     - 2 B_0 \sum^{\infty}_{n=1} u_n \cos (n\pi x).
 \end {equation}
@@ -325,7 +336,7 @@ with $U$ given by \eqref{eq:U}. Solving for $c^+$ and $c^-$ we get:
 \[
   c^+ = c^- = \frac{P_1 - P_2 + B_0(1 + 2 U)}{2\cosh(1/k)}.
 \]
-Then \eqref{eq:p1_series} gives 
+Then \eqref{eq:p1_general_sol} gives 
 \begin{equation}
     \label{eq:p1_series_tmp}
     p_1(x) = P_2 -  B_0 + u_0 \cosh(x/k) - 2B_0 \sum_{n=1}^\infty  u_n \cos(\pi n x) 
@@ -357,7 +368,7 @@ manipulation we obtain:
 
 
 \begin{equation}
-    \label{eq:fourier_coupling}
+    \label{eq:conductive_fourier_coupling}
     \frac{{\cal A}_0}{2} + \sum^{\infty}_{n=1} {\cal A}_n \cos (n\pi x) =  - u_0 \cosh(x/k).
 \end{equation}
 with
@@ -373,7 +384,7 @@ with
     + \sinh(n \pi) \Bigr]a_n
 \end{equation}
 
-for $n=1, \dots$. The left hand side of \eqref{eq:fourier_coupling} is the Fourier series, thus we determine
+for $n=1, \dots$. The left hand side of \eqref{eq:conductive_fourier_coupling} is the Fourier series, thus we determine
 remaining unknowns $B_0$, $A_n$ by computing Fourier of the function on the right hand side and comparing coefficients.
 
 For the zero term we have:
@@ -398,13 +409,13 @@ For other terms, we integrate by parts to get:
 %\]
 
 We plug \eqref{eq:u0} into the result and compare it with \eqref{eq:fourier_An} to obtain
-formula \eqref{eq:an} for coeficients $a_n$.
+formula \eqref{eq:an} for coefficients $a_n$.
 The only remaining unknown is $B_0$ which we determine by comparing \eqref{eq:u0_def} and \eqref{eq:u0}.
-Straight forwared calculation leads to \eqref{eq:b0}.
+Straight forward calculation leads to \eqref{eq:b0}.
 
 \subsection{Evaluation procedure}
 Formulas in Proposition \ref{proposition_continuous} are not suitable for practical calculations since hypergeometric functions are evaluated for large $n$.
-To remediate this issue we factor out and cancel $e^{\pi n}$. Actual evaluation then takes  following procedure:
+To remedy this issue, we factor out and cancel $e^{\pi n}$. Actual evaluation then takes  following procedure:
 
 \begin{enumerate}
     \item Set finite $N$ for truncated series. 
@@ -441,7 +452,7 @@ and for two consecutive terms:
 \[
     \tilde a_n + \tilde a_{n+1} \approx n^{-3} - (n+1)^{-3} \approx  n^{-4}. 
 \]
-Series for $p_2$ converge exponentialy for $y\ne 0$. Error for $y=0$ is of order $N^{-3}$ with exception
+Series for $p_2$ converge exponentially for $y\ne 0$. Error for $y=0$ is of order $N^{-3}$ with exception
 of  $x=1$ where $\cos(\pi n)$ cancels alternation in $a_n$ and error is $N^{-2}$.
 
 Even better is convergence of $u_n$ sums, since:
@@ -456,7 +467,7 @@ Practical behavior of errors follows these estimates.
 
 \section{Barrier fracture}
 \label{sec:barrier_frac}
-The case with discontinuous $p_2$ accross the fracture is solved by the same approach as the continuous case, 
+The case with discontinuous $p_2$ across the fracture is solved by the same approach as the continuous case, 
 but the derivation is slightly more technical. Considering the $y$ axis symmetry of the problem $(\ref{eq:Darcy_common} - \ref{eq:bc_1})$ and 
 the coupling $(\ref{eq:bc_barrier_p} - \ref{eq:coupling_barrier})$, we can consider the same system of equations 
 on reduced domains $\Omega_2^+ = (0,1)\times (0,1)$, $\Omega_2^- = (0,1)\times(-1,0)$,
@@ -538,7 +549,7 @@ In particular on  $\Gamma^+$ we have:
 % 
 
 \begin{equation}
-    \label{eq:fourier_coupling}
+    %\label{eq:fourier_coupling}
     \frac{{\cal A}_0^+}{2} + \sum^{\infty}_{n=1} {\cal A}_n^+ \cos (n\pi x) =  - \ol{u}_0 \cosh(x/ \ol{k}).
 \end{equation}
 with
@@ -559,7 +570,7 @@ We reuse the calculation of Fourier coefficients of the right hand side from \eq
 \end{align}
 Analogous relations hold for the lower side on $\Gamma^-$.
 
-Now we combine \eqref{eq:calAn_1} and \eqref{eq:calAn_2}, we cancel $\ol{u}_0$, and we substitute for $\ol{u}_n$ using \eqref{eq:barriaer_un}.
+Now we combine \eqref{eq:calAn_1} and \eqref{eq:calAn_2}, we cancel $\ol{u}_0$, and we substitute for $\ol{u}_n$ using \eqref{eq:barrier_un}.
 Performing the same operation for the ${\cal A}_n^-$  we obtain a system to determine $a_n^+$, $a_n^-$:
 
 \begin{equation}
@@ -606,7 +617,7 @@ where
 \end{align}
 The system matrix is strictly diagonally dominant providing $k_2^{+/-}$, $\sigma^{+/-}$, $k_1$ are positive.
 There for coefficients $a_n^{+/-}$ have the sign same as the right hand side, that is $(-1)^{n+1}$. This sign
-alternation cancel with signs in series fo $\ol{U}$, \eqref{eq:barrier_un} which makes $\ol{U}$ always possitive.
+alternation cancels with signs in series for $\ol{U}$ \eqref{eq:barrier_un} which makes $\ol{U}$ always positive.
 
 
 
@@ -622,7 +633,7 @@ and we plug it into  \eqref{eq:calA0_2} which we compare to \eqref{eq:calA0_1}. 
 obtain a system for $B_0^+$, $B_0^-$:
 
 \begin{equation}
-    \label{eq:an_system}
+    \label{eq:B0_system}
     \begin{pmatrix} 
             A^{00} & A^{01} \\ 
             A^{01} & A^{11}
@@ -634,12 +645,12 @@ obtain a system for $B_0^+$, $B_0^-$:
      =  
     \begin{pmatrix} 
         \ol{\sigma}\sigma^+(P^+_2 - P_b) \\ 
-        \ol{\sigma}\sigma^-(P^+_2 - P_b)
+        \ol{\sigma}\sigma^-(P^-_2 - P_b)
     \end{pmatrix}
 \end{equation}
 where
 \begin{align}
-    \label{eq:B0_system_p}
+    %\label{eq:B0_system_p}
     P_b &= (1-T) \ol{P}_2 + T P_1, \\
     A^{00} &= \ol{\sigma}k_2^+  + \ol{\sigma}\sigma^+ +(T-1)(\sigma^+)^2, \\
     A^{11} &= \ol{\sigma}k_2^-  + \ol{\sigma}\sigma^- +(T-1)(\sigma^-)^2, \\
@@ -683,52 +694,28 @@ Evaluation of the solution is performed in following steps:
 \begin{enumerate}
     \item Choose number of terms $N$ in the truncated sums.
     \item Solve systems \eqref{eq:an_system} to obtain $a_n^+$, $a_n^-$ for $n=1,\dots, N$.
-    \item Compute $\ol{u}_n$ and the sum $\ol{U}$ according to \eqref{eq:barriaer_un}.
-    \item Solve system $(\ref{eq:B0_system_p} - \ref{eq:B0_system_m})$ for $B_0^+$, $B_0^-$.
+    \item Compute $\ol{u}_n$ and the sum $\ol{U}$ according to \eqref{eq:barrier_un}.
+    \item Solve system \eqref{eq:B0_system} for $B_0^+$, $B_0^-$.
     \item Compute $\ol{u}_0$ using \eqref{eq:barrier_u0}.
     \item Evaluate $p_1$ or $p_2^+$, $p_2^-$ by truncated summation of the series \eqref{eq:barrier_p1_series},
           \eqref{eq:p2_barrier_p}, \eqref{eq:p2_barrier_m}, respectively.
 \end{enumerate}
 
+
+
+
+
 \section{Verification by finite differences}
-In order to verify correctness of the analytical solution we have implemented a finite difference solution for both the conductive fractue 
-and the barrier fracture. We use classical second order differences:
-\begin{align*}
-    f''(x) &= \frac{-2 f(x) + f(x-h) + f(x+h)}{h^2} + O(h^2),\\
-    f'(x) &= \frac{-3 f(x) + 4f(x+h) - f(x+2h)}{2h} + O(h^2)
-\end{align*}
-wher $h$ is the mesh step.
+\label{sec:verify}
 
-Figure \ref{fig:cont_solution} presents good match between the numerical solution ($h=0.01$) and the analytical solution using $1000$ terms in the sums.
-Estimate for the sum reminder is $10^{-5}$. The magnitude of the error is of order $10^{-4}$. For the whole technically feasible range $h\in (0.1, 0.001)$ 
-we have observed perfect second order convergence. 
-
-This is displayed at Figure \ref{fig:cont_rate} which contains results of a parametric study of the 
-convergence rate as a function of parameters $k_1 \in [0.01, 0.1, 1, 10, 100]$ and $\sigma$ passing through the same set of values. Pressures $P_2=10$, $P_1=5$
-are kept constant. For a fixed pair $k_1$, $\sigma$ we have estimated the rate of convergence by computing the finite difference solution for a sequence  
-of meshsteps $0.1,\ 0.05,\ 0.025,\ 0.0125$. For every meshstep the $L^2$ errors $\epsilon_1$ and $\epsilon_2$ were approximated by the midpoint rule 
-for $p_1$ and $p_2$ respectively. The order of convergence $p$ and the absolute error exponent $c$ were determined by the fit:
-\[
-        \log_2(\epsilon) \approx -c + p\log_2(h) 
-\]
-
-Clearly the optimal second order convergence or better is preserved for majority of the parameter space. The drop to the linear convergence for combination 
-of small $k_1$ and large $\sigma$ is due to extreme derivatives of $p_1$ close to the endpoints ${-1, 1}$. This behavior can not be resolved by the used regular gird.
-Also the absolute error exponent is well above $0$ so the error is of small magnitude. 
-
-
-
- 
-. The midpoint
-rule is used for approximation of the $L^2$ norms. 
 \begin{figure}
   \label{fig:cont_solution}
   \centering
   \includegraphics[width=\textwidth]{./continuous_solution.pdf}
   % continuous_convergency.pdf: 0x0 pixel, 300dpi, 0.00x0.00 cm, bb=
-  \caption{Conductive fracture case, $\sigma=20$, $k_1=10$, $k_2=1$, $P_2=10$, $P_1=5$, mesh step $h=0.01$. 
-  {\it Left:} Matching of the analytical and numerical solution. 
-  {\it Right:} Difference of the analytical and numerical solution.}
+  \caption{Conductive fracture case. 
+  {\it Left:} Match between the analytical and the numerical solution. 
+  {\it Right:} Difference of the analytical and the numerical solution.}
 \end{figure}
 
 \begin{figure}
@@ -736,7 +723,7 @@ rule is used for approximation of the $L^2$ norms.
   \centering
   \includegraphics[width=\textwidth]{./continuous_conv_rate.pdf}
   % continuous_convergency.pdf: 0x0 pixel, 300dpi, 0.00x0.00 cm, bb=
-  \caption{Convergence rate $p$ and absolute error exponent $c$ as a function of $k_1$ and $\sigma$. 
+  \caption{Convergence rate $p$ and absolute error exponent $c$ as a function of $k_2$ and $\sigma$. 
   {\it Left:} Order of convergence $p$ for $p_1$, $p_2$.
   {\it Right:} Absolute error exponent $c$ for $p_1$, $p_2$.}
 \end{figure}
@@ -745,12 +732,76 @@ rule is used for approximation of the $L^2$ norms.
 \begin{figure}
   \label{fig:barrier_solution}
   \centering
-  \includegraphics[width=\textwidth, keepaspectratio=true]{./continuous_solution.pdf}
+  \includegraphics[width=\textwidth, keepaspectratio=true]{./barrier_solution.pdf}
   % continuous_convergency.pdf: 0x0 pixel, 300dpi, 0.00x0.00 cm, bb=
-  \caption{Conductive fracture case, $\sigma=20$, $k_1=10$, $k_2=1$, $P_2=10$, $P_1=5$, mesh step $h=0.01$. 
-  {\it Left:} Matching of the analytical and numerical solution. 
-  {\it Right:} Difference of the anaytical and numerical solution.}
+  \caption{Barrier fracture case.
+  {\it Left:} Match between the analytical and the numerical solution. 
+  {\it Right:} Difference of the analytical and the numerical solution.}
 \end{figure}
+
+\begin{figure}
+  \label{fig:barrier_rate}
+  \centering
+  \includegraphics[width=\textwidth]{./barrier_conv_rate.pdf}
+  % continuous_convergency.pdf: 0x0 pixel, 300dpi, 0.00x0.00 cm, bb=
+  \caption{Convergence rate $p$ and absolute error exponent $c$ as a function of $k_2$ and $\sigma$. 
+  {\it Left:} Order of convergence $p$ for $p_1$, $p_2$.
+  {\it Right:} Absolute error exponent $c$ for $p_1$, $p_2$.}
+\end{figure}
+
+
+
+In order to verify correctness of the analytical solution we have implemented a finite difference solution for both the conductive fractue 
+and the barrier fracture. We use classical second order differences:
+\begin{align*}
+    f''(x) &= \frac{-2 f(x) + f(x-h) + f(x+h)}{h^2} + O(h^2),\\
+    f'(x) &= \frac{-3 f(x) + 4f(x+h) - f(x+2h)}{2h} + O(h^2)
+\end{align*}
+wher $h$ is the mesh step.
+
+Figure \ref{fig:cont_solution} presents good match between the numerical solution ($h=0.01$) and the analytical solution (truncation after $1000$ terms). 
+Problem parameters were: $\sigma=20$, $k_1=10$, $k_2=1$, $P_2=10$, $P_1=5$.
+Estimate for the sum reminder is $10^{-5}$. The magnitude of the error is of order $10^{-4}$. For the whole technically feasible range $h\in (0.1, 0.001)$ 
+we have observed perfect second order convergence. 
+
+This is displayed at Figure \ref{fig:cont_rate} which contains results of a parametric study of the 
+convergence rate as a function of parameters $k_1 \in [0.01, 0.1, 1, 10, 100]$ and $\sigma$ passing through the same set of values. The pressures $P_2=10$, $P_1=5$
+and the conductivity $k_2=1$ are kept constant. For a fixed pair $k_1$, $\sigma$ we have estimated the rate of convergence by computing the finite difference solution for a sequence  
+of mesh steps $0.1,\ 0.05,\ 0.025,\ 0.0125$. For every mesh step the $L^2$ errors $\epsilon_1$ and $\epsilon_2$ were approximated by the midpoint rule 
+for $p_1$ and $p_2$ respectively. The order of convergence $p$ and the absolute error exponent $c$ were determined by the fit:
+\[
+        \log_2(\epsilon) \approx -c + p\log_2(h) 
+\]
+
+Clearly the optimal second order convergence or better is preserved for majority of the parameter space. The drop to the linear convergence for combination 
+of small $k_1$ and large $\sigma$ is due to extreme derivatives of $p_1$ close to the endpoints ${-1, 1}$. This behavior can not be resolved by the used regular gird.
+Also the absolute error exponent is well above $0$ so the error have a small magnitude. 
+
+In the similar fashion we have tested the analytical solution to the barrier case. Shape of the solution and its match with the finite difference approximation 
+is shown in Figure \ref{fig:barrier_solution}. The problem parameters were: $k_1=0.5$, $k_2^+=5$, $k_2^-=2$, $\sigma^+=20$, $\sigma^-=10$, $P_1=0$, 
+$P_2^+=10$, $P_2^-=-10$, mesh step $h=0.01$. Notice the larger pressure gradient in lower part $\Omega^-$ with smaller conductivity $k_2^- = 2$, also the gap between 
+$p_1(x)$ and $p_2(x, 0)$ is larger due to smaller value of $\sigma^- = 10$. 
+
+The convergence rate for varying parameters is shown in Figure \ref{fig:barrier_rate}. In particular we have used $\sigma^+ = 3*\sqrt{\sigma}$, $\sigma^- = \sigma$
+and $k_2^+ = k_2$, $k_2^- = \sqrt{k_2}$ with both $\sigma$ and $k_2$ iterating through the list $[0.01, 0.1, 1, 10, 100]$. Remaining parameters were fixed on 
+following values: $k_1=1$, $P_2^+=10$, $P_2^-=-10$, $P_1=0$. Overall convergence rate is close to or beyond second order as in the previous case we see problems 
+of the finite differences to resolve high gradient in $p_1$ for high $k_2$ and $\sigma$. Absolute error is also small for small $k_2$ which is natural since the 
+solution (both $p_1$ and $p_2$) tends to be constant in $x$. 
+
+\section{Conclusion}
+\label{sec:conclusion}
+The analytical solutution in form of Fourier series has been deriverd for the symmetrical conductive fracture problem as well as for 
+the general barrier fracture problem. The solution was modified for practical calculations and convergence rate of the series were estimated theoretically and 
+confirmed numericaly. It was realized that summing $100$ terms provides precision about $10^-6$ which would be enough for most of applications.
+Adaptive summation can do even better. Analytical solution was succefully verified against a finite difference solution.  
+
+The analyical solution is used as part of the test suit of the software Flow123d \cite{flow123d} to test various methods of coupling for both conforming 
+and non-conforming mixed meshes.
+
+
+
+ \bibliographystyle{plain} 
+ \bibliography{analytical_fracture.bib}
 
 
 \end{document}
