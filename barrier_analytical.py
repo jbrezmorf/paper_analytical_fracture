@@ -549,7 +549,7 @@ def compute_error(n_terms, fd_n, k2, sigma, y_band=True):
     #cbar.ax.set_ylabel('diff')
 
     # Error lines for constant x
-    for ix in [int(0.5*nx), int(0.8*nx), int(nx-1)]:
+    for ix in [int(0.5*nx), int(0.8*nx), int(nx-1)]:heapq decrease key
         ax2.plot(y[band], p2_diff[:, ix], label='ix')
     ax2.legend()
 

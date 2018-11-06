@@ -729,25 +729,6 @@ Evaluation of the solution is performed in following steps:
 \end{figure}
 
 
-\begin{figure}
-  \label{fig:barrier_solution}
-  \centering
-  \includegraphics[width=\textwidth, keepaspectratio=true]{./barrier_solution.pdf}
-  % continuous_convergency.pdf: 0x0 pixel, 300dpi, 0.00x0.00 cm, bb=
-  \caption{Barrier fracture case.
-  {\it Left:} Match between the analytical and the numerical solution. 
-  {\it Right:} Difference of the analytical and the numerical solution.}
-\end{figure}
-
-\begin{figure}
-  \label{fig:barrier_rate}
-  \centering
-  \includegraphics[width=\textwidth]{./barrier_conv_rate.pdf}
-  % continuous_convergency.pdf: 0x0 pixel, 300dpi, 0.00x0.00 cm, bb=
-  \caption{Convergence rate $p$ and absolute error exponent $c$ as a function of $k_2$ and $\sigma$. 
-  {\it Left:} Order of convergence $p$ for $p_1$, $p_2$.
-  {\it Right:} Absolute error exponent $c$ for $p_1$, $p_2$.}
-\end{figure}
 
 
 
@@ -788,11 +769,32 @@ following values: $k_1=1$, $P_2^+=10$, $P_2^-=-10$, $P_1=0$. Overall convergence
 of the finite differences to resolve high gradient in $p_1$ for high $k_2$ and $\sigma$. Absolute error is also small for small $k_2$ which is natural since the 
 solution (both $p_1$ and $p_2$) tends to be constant in $x$. 
 
+\begin{figure}
+  \label{fig:barrier_solution}
+  \centering
+  \includegraphics[width=\textwidth, keepaspectratio=true]{./barrier_solution.pdf}
+  % continuous_convergency.pdf: 0x0 pixel, 300dpi, 0.00x0.00 cm, bb=
+  \caption{Barrier fracture case.
+  {\it Left:} Match between the analytical and the numerical solution. 
+  {\it Right:} Difference of the analytical and the numerical solution.}
+\end{figure}
+
+\begin{figure}
+  \label{fig:barrier_rate}
+  \centering
+  \includegraphics[width=\textwidth]{./barrier_conv_rate.pdf}
+  % continuous_convergency.pdf: 0x0 pixel, 300dpi, 0.00x0.00 cm, bb=
+  \caption{Convergence rate $p$ and absolute error exponent $c$ as a function of $k_2$ and $\sigma$. 
+  {\it Left:} Order of convergence $p$ for $p_1$, $p_2$.
+  {\it Right:} Absolute error exponent $c$ for $p_1$, $p_2$.}
+\end{figure}
+
+
 \section{Conclusion}
 \label{sec:conclusion}
 The analytical solutution in form of Fourier series has been deriverd for the symmetrical conductive fracture problem as well as for 
 the general barrier fracture problem. The solution was modified for practical calculations and convergence rate of the series were estimated theoretically and 
-confirmed numericaly. It was realized that summing $100$ terms provides precision about $10^-6$ which would be enough for most of applications.
+confirmed numericaly. It was realized that summing $100$ terms provides precision about $10^{-6}        $ which would be enough for most of applications.
 Adaptive summation can do even better. Analytical solution was succefully verified against a finite difference solution.  
 
 The analyical solution is used as part of the test suit of the software Flow123d \cite{flow123d} to test various methods of coupling for both conforming 
