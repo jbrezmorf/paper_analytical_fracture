@@ -1,4 +1,4 @@
-\documentclass[a4paper,10pt]{article}
+\documentclass{elsarticle}
 
 \usepackage{amsmath}
 \usepackage{amsfonts}
@@ -17,34 +17,51 @@
 \def\todo#1{{TODO:\color{red}#1}}
 \def\ol#1{\overline{#1}}
 \def\log{{\rm log}}
+
+
 %opening
-\title{Analytical solution to a single fracture test problem
-%\thanks{This work was supported by the Technology Agency of the Czech Republic under the project no. TA01021331. }
-}
-\author{%
-Jan B\v rezina
-\thanks{Technical University in Liberec, Studentsk\'a 2, Liberec, Czech Republic ({\tt jan.brezina@tul.cz}).},
-Pavel Burda
-\thanks{Czech Technical University, (pavel.burda@fs.cvut.cz)}
-}
 
-
-
-
-
+% Possible Journals:
+% https://agupubs.onlinelibrary.wiley.com/doi/abs/10.1029/WR026i010p02331
 
 \begin{document}
 
-\maketitle
+\begin{frontmatter}
+
+\title{Analytical solution to a single fracture test problem
+%\thanks{This work was supported by the Technology Agency of the Czech Republic under the project no. TA01021331. }
+}
+\author[1]{Jan B\v rezina\corref{cor1}%
+\ead{jan.brezina@tul.cz}}
+\cortext[cor1]{Corresponding author}
+\address[1]{Technical University in Liberec, Studentsk\'a 2, Liberec, Czech Republic.}
+\author[2]{Pavel Burda%
+\ead{pavel.burda@fs.cvut.cz}}
+\address[2]{Czech Technical University, Prague, Czech Republic.}
 
 \begin{abstract}
-An analytical solution to a test Darcy flow problem on a square domain with a single horizontal fracture is
-derived in terms of Fourier series. Distinct pressure variables $p_1$ and $p_2$ are considered for 
-the fracture and the matrix respectively coupled together by a Robin type condition. 
-Two cases are treated: the conductive fracture with $p_2$ continuous and symmetric about the fracture and the barrier fracture,
-generalization with separate $p_2$ and parameters for upper and lower part. The analytical solution was verified against
-the numerical solution using second order finite differences. 
+The Fourier method is used to derive an analytical solution to a Darcy flow problem on a square domain with a single discrete fracture. Distinct pressure variables are considered for the fracture and the matrix respectively coupled together by a 
+Robin-type condition. 
+Two cases are treated: the conductive fracture with pressure continuous and symmetric about the fracture and the barrier fracture,
+a generalization with separate pressure and matrix parameters for the upper and the lower part of the domain. The analytical solution is verified against the numerical solution using second-order finite differences. 
 \end{abstract}
+
+\begin{keyword}
+Darcy flow,
+fractured porous media,
+analytical solution, 
+fourier series
+%% keywords here, in the form: keyword \sep keyword
+
+%% PACS codes here, in the form: \PACS code \sep code
+
+%% MSC codes here, in the form: \MSC code \sep code
+%% or \MSC[2008] code \sep code (2000 is the default)
+
+\end{keyword}
+
+\end{frontmatter}
+
 
 %\begin{keywords} 
 %fracture flow, mortar methods, mixed-hybrid finite elements
@@ -54,47 +71,50 @@ the numerical solution using second order finite differences.
 %15A15, 15A09, 15A23
 %\end{AMS}
 
-%\pagestyle{myheadings}
-%\thispagestyle{plain}
-%\markboth{Jan B\v rezina}{Mortar methods and MHFEM for elliptic problems on complex geometries.}
 
 
 \section{Introduction}
-Fractures, cracks, fissures, faults and other discontinuities are ubiquitous in real rock formations especially granitoids.  
-Fractures present a challenge for subsurface water flow modeling as they have small volume but large permeability with
-potentially large impact on the pressure and velocity fields. Alternatively the filled fractures can behave as barriers. 
+\todo{Add references for:
+fracture flow applications, DFN description vs. Continuum flow description, explain different papaers dealing with C-F approach. 
+Reference for classical Fourier method.}
 
-Fractures occurs on wide range of scales. Small scale fractures could be homogenized, while fractures with scales 
-comparable to the dimensions of a domain should be captured explicitly. The large scale fractures are still very thin and 
-a direct discretization with any mesh based method (FE, FV, DG, \dots) requires high level of refinement which become 
-costly especially for large number of fractures. A solution to this problem is usage of a {\it mixed mesh} combining 
-the elements of different dimension. It has been shown that for the advection-diffusion equation the original 3d (or 2d) 
-problem can be approximated by the system of 3d-2d (or 2d-1d) problems coupled by a Robin type condition (see e.g. \cite{Martin2005},
-, \cite{fumagalli_numerical_2011}, \cite{brezina_analysis_2015}). 
+Fractures, cracks, fissures, faults, and other discontinuities are ubiquitous  especially in crystaline rocks.  Although they occupy a tiny fraction of the rock volume their impact
+on the groundwater flow is significant. Open fractures and their systems form preferential paths with much larger Darcian velocity. This heterogeneity leads to much smaller breakthrough times in the transport of contaminants. On the other hand, the healed fractures can behave as barriers.
+\todo{More general applications, to the fracture flow}
 
-For the purpose of testing implementations of the mixed mesh approach in combination with different numerical methods
-it is necessary to have a suitable test problem with known solution. A common approach is to plug any function into the equations
-and prescribe resulting right hand side. This approach is convenient to test correctness of the implementation but often turns out to
+
+\todo{DEscribe farctal nature of the fracture networks and DFN vs. continuum models vs. CF model}
+Fractures occur occur on a wide range of scales. Small scale fractures can be modeled by modified average permeability of the rock, while the large fractures at the scale comparable to the dimensions of a domain should be described explicitly in order to capture preferential paths. Even the large-scale fractures are still very thin and their direct discretization by 3d elements leads to high levels of mesh refinement which become 
+costly especially for a large number of fractures. A solution to this problem is the usage of a {\it mixed mesh} combining the elements of a different dimension. It has been shown that for the advection-diffusion equation the original 3d (or 2d) problem can be approximated by the system of 3d-2d (or 2d-1d) problems coupled by a Robin type condition (see e.g. \cite{Martin2005}, \cite{fumagalli_numerical_2011}, \cite{Angot},\cite{brezina_analysis_2015}). 
+
+For the purpose of testing the implementation of various numerical schemes for advection-diffusion equations on the mixed mesh, it is necessary to have a suitable test problem with a known solution. A common approach is to plug any function into the equations and prescribe the resulting right-hand side. This approach is convenient to test the correctness of the implementation but often turns out to
 do not capture peculiarities of the real solution and thus may be unsuitable for tests of convergence of the used method. 
 
-To this end we propose a test Darcy flow problem consisting of the square domain (matrix) and the single horizontal fracture 
-cutting the domain into upper and lower part.  
+
+
+
+To this end, we propose a test Darcy flow problem consisting of the square domain (matrix) and the single horizontal fracture 
+cutting the domain into the upper and lower parts.  
 Two cases are considered: the {\it conductive fracture} and the more general {\it barrier fracture}.
 The conductive fracture assumes symmetry about the fracture yet keeping separate pressure for the matrix and for the fracture. 
-This case is relatively simple to solve but have very limited practical usage.
-The barrier fracture case is a generalization where the problem parameters as well as the matrix pressure ere treated independently f
-or the upper and the lower part of the matrix domain. Both problems are introduced in Section \ref{sec:setting}.
+This case is relatively simple to solve but has very limited practical usage.
+The barrier fracture case is a generalization where the problem parameters, as well as the matrix pressure, are treated independently on
+ the upper and the lower part of the matrix domain. Both problems are introduced in Section \ref{sec:setting}.
 The solution to the conductive fracture problem is derived in Section \ref{sec:continuous_frac} the same approach with necessary modifications and extensions
 is used to derive the solution to the barrier fracture problem in Section \ref{sec:barrier_frac}. In Section \ref{sec:verify}, 
-both solutions are verified against a numerical solution provided by the second order finite difference scheme on a regular grid. 
+both solutions are verified against a numerical solution provided by the second-order finite difference scheme on a regular grid. 
 Conclusions are summarized in the final Section \ref{sec:conclusion} 
 
 
+Book about Fourier method:
+\cite{Brown1993}
+
+Application of the Furier method to the Darcy flow problems: \cite{Onder1998}
 
 
 \section{Test problems}
 \label{sec:setting}
-Main result of the paper is derivation of the strong analytical solution for two test problems with coupling between continuum and a fracture.
+The main result of the paper is the derivation of the strong analytical solution for two test problems with coupling between continuum and a fracture.
 A Darcy flow is considered  on a square 2D domain $\Omega_2 = (-1,1)\times(-1,1)$
 with a horizontal fracture $\Omega_1 = { (x,0) : x\in (-1,1)}$. The fracture splits $\Omega_2$ into upper and 
 lower part $\Omega_2^+$ and $\Omega_2^-$, respectively.
@@ -126,12 +146,12 @@ Then we prescribe following boundary conditions
   \label{eq:bc_1}
 \end{align}
 
-In order to complete the problem we must prescribe boundary conditions on the fracture and specify the source term $f$. Here we 
+To complete the problem, we must prescribe boundary conditions on the fracture and specify the source term $f$. Here we 
 distinguish two cases: the \emph{conductive fracture} and the \emph{barrier fracture}.
 
 
-{\bf Conductive fracture.} In this case we assume a fracture with similar or higher conductivity then in the continuum, $k_1 \ge k_2$.
-In such case we can assume continuity of the pressure across the fracture. However we keep difference between $p_2$ and $p_1$ on the fracture.
+{\bf Conductive fracture.} In this case, we assume a fracture with similar or higher conductivity than in the continuum, $k_1 \ge k_2$.
+In such case, we can assume continuity of the pressure across the fracture. However we keep difference between $p_2$ and $p_1$ on the fracture.
 We set:
 \begin{align}
   \label{eq:c_coupling_a}
@@ -461,7 +481,7 @@ Even better is convergence of $u_n$ sums, since:
 \]
 Thus for calculation of $p_1$ we have error  $N^{-5}$ (for $x=1$ only $N^{-4}$). The error of $U$ is only $N^{-4}$ 
 as the sign alternation cancels with alternation of $a_n$.
-Practical behavior of errors follows these estimates.
+The practical behavior of errors follows these estimates.
 
 
 
@@ -688,7 +708,7 @@ and the system matrix is always strictly diagonally dominant.
 % \]
 
 
-\section{Evaluation procedure}
+\subsection{Evaluation procedure}
 
 Evaluation of the solution is performed in following steps:
 \begin{enumerate}
@@ -754,9 +774,9 @@ for $p_1$ and $p_2$ respectively. The order of convergence $p$ and the absolute 
         \log_2(\epsilon) \approx -c + p\log_2(h) 
 \]
 
-Clearly the optimal second order convergence or better is preserved for majority of the parameter space. The drop to the linear convergence for combination 
-of small $k_1$ and large $\sigma$ is due to extreme derivatives of $p_1$ close to the endpoints ${-1, 1}$. This behavior can not be resolved by the used regular gird.
-Also the absolute error exponent is well above $0$ so the error have a small magnitude. 
+Clearly, the optimal second-order convergence or better is preserved for the majority of the parameter space. The drop to the linear convergence for combination 
+of small $k_1$ and large $\sigma$ is due to extreme derivatives of $p_1$ close to the endpoints ${-1, 1}$. This behavior can not be resolved by the used regular grid.
+Also, the absolute error exponent is well above $0$ so the error has a small magnitude. 
 
 In the similar fashion we have tested the analytical solution to the barrier case. Shape of the solution and its match with the finite difference approximation 
 is shown in Figure \ref{fig:barrier_solution}. The problem parameters were: $k_1=0.5$, $k_2^+=5$, $k_2^-=2$, $\sigma^+=20$, $\sigma^-=10$, $P_1=0$, 
@@ -792,12 +812,12 @@ solution (both $p_1$ and $p_2$) tends to be constant in $x$.
 
 \section{Conclusion}
 \label{sec:conclusion}
-The analytical solutution in form of Fourier series has been deriverd for the symmetrical conductive fracture problem as well as for 
-the general barrier fracture problem. The solution was modified for practical calculations and convergence rate of the series were estimated theoretically and 
-confirmed numericaly. It was realized that summing $100$ terms provides precision about $10^{-6}        $ which would be enough for most of applications.
-Adaptive summation can do even better. Analytical solution was succefully verified against a finite difference solution.  
+The analytical solution in a form of Fourier series has been derived for the symmetrical conductive fracture problem as well as for 
+the general barrier fracture problem. The solution was modified for practical calculations and the convergence rate of the series was estimated theoretically and 
+confirmed numerically. It was realized that summing $100$ terms provides precision about $10^{-6}$ which would be enough for most applications.
+The adaptive summation can do even better. The analytical solution was successfully verified against a finite difference solution.  
 
-The analyical solution is used as part of the test suit of the software Flow123d \cite{flow123d} to test various methods of coupling for both conforming 
+The analytical solution is used as part of the test suit of the software Flow123d \cite{flow123d} to test various methods of coupling for both conforming 
 and non-conforming mixed meshes.
 
 

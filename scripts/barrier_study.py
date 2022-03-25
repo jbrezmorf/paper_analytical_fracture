@@ -12,12 +12,18 @@ import matplotlib.pyplot as plt
 
 
 from matplotlib import cm
+from matplotlib import colors as mcolors
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from mpl_toolkits.mplot3d import axes3d
 
+"""
+Barrier fracture case
+- discontinuous matrix pressure
+- separate communication of the fracture to the lowwer and the upper part
 
-# Analytica solution to continuous case
-
+- evaluation of the analytical solution
+- parametric study for comparison to the numerical solution via. finite differences
+"""
 class TripletMatrix:
     def __init__(self, N, M):
         self.shape = (N, M)
@@ -343,12 +349,13 @@ def plot_solution():
     Plot both analytical and FD solution. and errors
     :return:
     """
-    #ac = BarrierFracture(k1=0.5, k2=(5,2), sigma=(20,10), P1=0, P2=(10, -10), n_terms=1000)
-    sigma = k2 = 0.01
-    sigma_values = (3*sigma ** 0.5, sigma)
-    k2_values = (k2, k2**0.5 )
+    ac = BarrierFracture(k1=0.5, k2=(5,2), sigma=(20,10), P1=0, P2=(10, -10), n_terms=1000)
+    #sigma = 10**(-0.125)
+    #k2 = 10**(-2.625)
+    #sigma_values = (2*sigma ** 0.5, sigma)
+    #k2_values = (k2, k2**0.5 )
 
-    ac = BarrierFracture(k1=1, k2=k2_values, sigma=sigma_values, P1=0, P2=(10, -10), n_terms=1000)
+    #ac = BarrierFracture(k1=1, k2=k2_values, sigma=sigma_values, P1=0, P2=(10, -10), n_terms=100)
 
     nx,  ny = 200, 200
     x, y, p1_fd, p2_fd = ac.solve_fd(nx, ny)
@@ -362,10 +369,10 @@ def plot_solution():
 
     norm = matplotlib.colors.Normalize(-1.3, 1.3)
     #cmap_an = matplotlib.cm.get_cmap('autumn')
-    cmap_fd = matplotlib.cm.get_cmap('coolwarm')
+    cmap_fd = matplotlib.cm.get_cmap('winter')
 
     y_cuts = [1, 0.5, 1e-8, -1e-8, -0.5, -1]
-    for y in y_cuts:
+    for y in reversed(y_cuts):
         sgn = 1 if y>0 else -1
 
         iy = int(abs(y)*ny/2)
@@ -377,10 +384,10 @@ def plot_solution():
 
         p2_ycut = p2_fd[iy, :]
 
-        p2_plt, = ax.plot(x, p2_ycut, linewidth=3, color="blue", label="p2, fd, y={:4.2f}".format(y_true))
+        p2_plt, = ax.plot(x, p2_ycut,  color=cmap_fd(norm(y_color)), label="p2, fd, y={:4.2f}".format(y_true))
         #fd_plots.append(p2_plt)
         p2_an = ac.vec_eval_p2(x, y_true)
-        p2_plt, = ax.plot(x, p2_an, color="orange", label="p2, an, y={:4.2f}".format(y_true))
+        #p2_plt, = ax.plot(x, p2_an, color="orange", label="p2, an, y={:4.2f}".format(y_true))
         #an_plots.append(p2_plt)
         add_text(ax, p2_ycut, "p2, y={:4.2f}".format(y_true), 0.1)
 
@@ -388,24 +395,25 @@ def plot_solution():
 
     #fd_plots = []
     #an_plots = []
-    p1_plt, = ax.plot(x, p1_fd, linewidth=3, color='blue', label="p1, fd")
+    p1_plt, = ax.plot(x, p1_fd, color='red', label="p1, fd")
 
     #fd_plots.append(p1_plt)
     p1_an = ac.vec_eval_p1(x)
-    p1_plt, = ax.plot(x, p1_an, color='orange', label="p1, an")
+    #p1_plt, = ax.plot(x, p1_an, color='orange', label="p1, an")
     #an_plots.append(p1_plt)
     add_text(ax, p1_fd, "p1", -0.3)
 
-    ax_err.plot(x, p1_fd - p1_an, color='green', label="p1_diff")
+    ax_err.plot(x, p1_fd - p1_an, color='red', label="p1_diff")
 
     ax.set_xlabel("x")
+    ax.set_ylabel("pressure")
     p_list = [ac.P1, ac.P2[0], ac.P2[1]]
     ax.set_ylim( (min(p_list)-0.5, 1.1*max(p_list)+0.5) )
 
     #ax_err.legend(bbox_to_anchor=(1.05, 1), loc=0, borderaxespad=0.)
     ax_err.legend(loc=9)
     ax_err.set_xlabel("x")
-    ax_err.set_ylabel("difference")
+    ax_err.set_ylabel("pressure difference")
     ax_err.ticklabel_format(style='sci', scilimits=(0,0))
 
     #y = (ac.P1 - ac.P2) * np.cosh( x/ac.k1) / np.cosh(1/ac.k1) + ac.P2
@@ -435,7 +443,8 @@ def plot_solution():
     # ax_right.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     # ax_right.set_xlabel("Y direction")
 
-    #plt.savefig("barrier_solution.pdf", bbox_inches='tight')
+
+    plt.savefig("barrier_solution.pdf", bbox_inches='tight')
     plt.show()
     return
     # compute approx of -k2*\Lapl p_2 for analytical sol.
@@ -524,6 +533,7 @@ def compute_error(n_terms, fd_n, k2, sigma, y_band=True):
 
     p2_l2 = la.norm(p2_diff.ravel()) * np.sqrt(2.0/ nx * 2.0/ ny)
 
+    print("Errors: ", "e1:", p1_l2, "e2:", p2_l2)
     return p1_l2, p2_l2
 
     fig = plt.figure(figsize=(15, 5))
@@ -549,7 +559,7 @@ def compute_error(n_terms, fd_n, k2, sigma, y_band=True):
     #cbar.ax.set_ylabel('diff')
 
     # Error lines for constant x
-    for ix in [int(0.5*nx), int(0.8*nx), int(nx-1)]:heapq decrease key
+    for ix in [int(0.5*nx), int(0.8*nx), int(nx-1)]:
         ax2.plot(y[band], p2_diff[:, ix], label='ix')
     ax2.legend()
 
@@ -724,79 +734,95 @@ def plot_analytical_eq():
 
 
 def error_decay_parameter_study():
-    sigma_bounds = np.arange(-2, 4, 0.25)
-    k2_bounds = np.arange(-2, 4, 0.25)
+    step = 0.25
+    sigma_bounds = np.arange(-3, 3+step, step)
+    k2_bounds = np.arange(-3, 3+step, step)
     sigma_list = (sigma_bounds[0:-1] + sigma_bounds[1:])/2
     k2_list = (k2_bounds[0:-1] + k2_bounds[1:]) / 2
     fit_table = np.empty( (len(sigma_list), len(k2_list), 2, 2))
     for isg, sigma_log in enumerate(sigma_list):
         for ik2, k2_log in enumerate(k2_list):
+            print("Case: sigma ", sigma_log, " k2 ", k2_log)
             sigma = 10.0**sigma_log
             k2 = 10.0**k2_log
+            
             nx_list = [20, 40, 80, 160, 320]
+            #nx_list = [20, 40, 80]
             err_table = np.empty( (len(nx_list), 2) )
             for inx, nx in enumerate(nx_list):
-                sigma_values = (3*sigma**0.5, sigma )
+                #sigma_values = (3*sigma**0.5, sigma )
+                sigma_values = (2*sigma**0.5, sigma )     # Assymetry to avoid trivial case, p1=0
                 k2_values = (k2, k2**0.5)
-                err_table[inx, :] = compute_error(100, nx, k2_values, sigma_values, y_band=0.1)
-            fit_table[isg, ik2,:, :] = np.polyfit(np.log(np.array(nx_list)), np.log2(err_table[:,:]), deg = 1)
+                err_table[inx, :] = compute_error(100, nx, k2_values, sigma_values, y_band=0.05)
+            fit_table[isg, ik2,:, 0] = np.polyfit(-np.log10(np.array(nx_list)), np.log10(err_table[:, 0]), deg = 1)
+            fit_table[isg, ik2,:, 1] = np.polyfit(-np.log10(np.array(nx_list)), np.log10(err_table[:, 1]), deg = 1)
 
     fig = plt.figure(figsize=(16, 3))
 
-    ax = fig.add_subplot(141)
-    ax.set_ylabel("$k_2$")
+    ax0 = fig.add_subplot(141)
+    ax0.set_ylabel("$k_2$")
+    ax0.set_yscale('log')
+  
     ax_list =  [
-        ax,
-        fig.add_subplot(142, sharey = ax),
-        fig.add_subplot(143, sharey = ax),
-        fig.add_subplot(144, sharey = ax)
+        ax0,
+        fig.add_subplot(142, sharey = ax0),
+        fig.add_subplot(143, sharey = ax0),
+        fig.add_subplot(144, sharey = ax0)
     ]
     im_list =[]
     X,Y = np.meshgrid(10.0**sigma_bounds, 10.0**k2_bounds)
 
-    cm = [ matplotlib.cm.get_cmap('plasma'), matplotlib.cm.get_cmap('viridis') ]
+    cm = [ matplotlib.cm.get_cmap('seismic'), matplotlib.cm.get_cmap('PRGn') ]
+    divnorm = [mcolors.DivergingNorm(vcenter=2), mcolors.DivergingNorm(vcenter=0)]
     for i_deg in [0, 1]:
         for i_dim in [0, 1]:
             ii = i_dim +  2*i_deg
             ax = ax_list[ii]
             #ax.axis('equal')
-            im = ax.pcolormesh(X, Y, -fit_table[:,:, i_deg, i_dim], cmap=cm[i_deg])
+            im = ax.pcolormesh(X, Y, fit_table[:,:, i_deg, i_dim], cmap=cm[i_deg], norm=divnorm[i_deg])
             ax.set_xscale('log')
-            ax.set_yscale('log')
             im_list.append(im)
+            
             #ax.set_xticks(np.arange(0, len(sigma_list), 1))
             #ax.set_yticks(np.arange(0, len(k2_list), 1))
-            #ax.set_xticklabels(10.0 ** sigma_list)
-            #ax.set_yticklabels(10.0 ** k2_list)
+            #ax.set_xticks(10.0 ** sigma_list)
+            #ax.set_yticks(10.0 ** k2_list)
             #ax.ticklabel_format(style='sci', scilimits=(0, 0))
 
+            ax.yaxis.set_minor_locator(plt.NullLocator())
+            ax.xaxis.set_major_locator(plt.LogLocator(numticks=4))
+            ax.yaxis.set_major_locator(plt.LogLocator(numticks=7))
+            #ax.tick_params(
+                #axis='both',  # changes apply to the x-axis
+                #which='minor',  # both major and minor ticks are affected
+                #left='off',
+                #bottom='off')  # labels along the bottom edge are off
 
-            ax.tick_params(
-                axis='both',  # changes apply to the x-axis
-                which='minor',  # both major and minor ticks are affected
-                left='off',
-                bottom='off')  # labels along the bottom edge are off
+            #ax.tick_params(
+                #axis='y',  # changes apply to the x-axis
+                #which='minor',  # both major and minor ticks are affected
+                #left='off',
+                #labelleft='off',
+                #bottom='off')  # labels along the bottom edge are off
 
+            # avoid ticks labels for vertical axis
             if ii > 0:
-                ax.tick_params(
-                    axis='y',  # changes apply to the x-axis
-                    which='both',  # both major and minor ticks are affected
-                    labelleft='off')  # labels along the bottom edge are off
+                plt.setp(ax.get_yticklabels(), visible=False)
+                #ax.yaxis.set_major_formatter(plt.NullFormatter())
+                #ax.tick_params(
+                    #axis='y',  # changes apply to the y-axis
+                    #which='both',  # both major and minor ticks are affected
+                    #labelleft='off')  # labels along the left edge are off
 
-
-    ax_list[0].set_xlabel("$\sigma$, order, p1 ")
-    ax_list[1].set_xlabel("$\sigma$, order, p2 ")
-    ax_list[2].set_xlabel("$\sigma$, abs_err, p1 ")
-    ax_list[3].set_xlabel("$\sigma$, abs_err, p2 ")
-    fig.colorbar(im_list[0], ax=ax_list[:2])
-    fig.colorbar(im_list[2], ax=ax_list[2:])
-
-    # Adding the colorbar
-    # cb_ax = fig.add_axes([0.1, 0.1, 0.03, 0.8])  # This is the position for the colorbar
-    # fig.colorbar(im_list[0], cax=cb_ax)
-    #
-    # cb_ax = fig.add_axes([3, 0.1, 0.03, 0.8])  # This is the position for the colorbar
-    # fig.colorbar(im_list[2], cax=cb_ax)
+    ax_list[0].set_xlabel("$\sigma$, p1")
+    ax_list[1].set_xlabel("$\sigma$, p2")
+    ax_list[2].set_xlabel("$\sigma$, p1")
+    ax_list[3].set_xlabel("$\sigma$, p2")
+    
+    cbar_order = fig.colorbar(im_list[0], ax=ax_list[:2])
+    cbar_order.set_label("order of convergece", rotation=90)
+    cbar_magnitude = fig.colorbar(im_list[2], ax=ax_list[2:])
+    cbar_magnitude.set_label("error magnitude, log10", rotation=90)
 
     #plt.tight_layout()
     #plt.gcf().subplots_adjust(bottom=0.15)

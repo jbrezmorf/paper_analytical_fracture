@@ -12,11 +12,20 @@ import matplotlib.pyplot as plt
 
 
 from matplotlib import cm
+from matplotlib import colors as mcolors
 from matplotlib.ticker import LinearLocator, FormatStrFormatter
 from mpl_toolkits.mplot3d import axes3d
 
 
-# Analytica solution to continuous case
+"""
+Conductive fracture case
+- continuous matrix pressure
+- fracture coupled to the matrix through a single Robin-type boundary condition, communication with the lower and the upper part 
+  symmetricaly
+
+- evaluation of the analytical solution
+- parametric study for comparison to the numerical solution via. finite differences
+"""
 
 class TripletMatrix:
     def __init__(self, N, M):
@@ -55,6 +64,7 @@ class ContinousFracture:
         self.P1 = P1
         self.P2 = P2
         self.n_terms = n_terms
+        print("params:  ", k1, k2, sigma, P1, P2, n_terms)
         ###
         self.precompute_analytical()
 
@@ -115,7 +125,7 @@ class ContinousFracture:
         for i in range(1, 10):
             e = np.log(np.abs(np.sum( np.cos(nn*np.pi/i)*self.an[self.n_terms:])))
             err.append(e)
-        print(err)
+        #print(err)
         #an_x2_err = np.sum(np.cos(nn * np.pi) * self.un[self.n_terms:])
 
 
@@ -277,7 +287,7 @@ class ContinousFracture:
     def solve_fd(self, nx, ny):
         self.fd_shape = (nx, ny)
         A, b = self.form_fd_matrix(nx, ny)
-        print("A shp: ", A.shape)
+        #print("A shp: ", A.shape)
         self.dof_values = sp_la.spsolve(A, b)
 
         # dof_values - have dofs only for right side
@@ -307,9 +317,9 @@ def plot_solution():
     Plot both analytical and FD solution. and errors
     :return:
     """
-    ac = ContinousFracture(k1=10, k2=1, sigma=20, P1=5, P2=10, n_terms=1000)
-
-    nx,  ny = 200, 200
+    #ac = ContinousFracture(k1=10, k2=1, sigma=20, P1=5, P2=10, n_terms=100)
+    ac = ContinousFracture(k1=1, k2=1e5, sigma=10, P1=5, P2=10, n_terms=100)
+    nx,  ny = 20, 20
     x, y, p1_fd, p2_fd = ac.solve_fd(nx, ny)
 
     fig = plt.figure(figsize=(13, 5))
@@ -323,17 +333,18 @@ def plot_solution():
     cmap_an = matplotlib.cm.get_cmap('autumn')
     cmap_fd = matplotlib.cm.get_cmap('winter')
 
+
     y_cuts = [0, 0.2, 0.4, 0.6, 0.8, 1]
-    for y in y_cuts:
+    for y in reversed(y_cuts):
         iy = int(y*ny/2)
         y_true = 2.0/ny * iy
         iy = int(ny/2) - iy
         p2_ycut = p2_fd[iy, :]
 
-        p2_plt, = ax.plot(x, p2_ycut, linewidth=3, color="blue", label="p2, fd, y={:4.2f}".format(y_true))
+        p2_plt, = ax.plot(x, p2_ycut, color=cmap_fd(y_true), label="p2, fd, y={:4.2f}".format(y_true))
         #fd_plots.append(p2_plt)
         p2_an = ac.vec_eval_p2(x, y_true)
-        p2_plt, = ax.plot(x, p2_an, color="orange", label="p2, an, y={:4.2f}".format(y_true))
+        #p2_plt, = ax.plot(x, p2_an, color="orange", label="p2, an, y={:4.2f}".format(y_true))
         #an_plots.append(p2_plt)
         add_text(ax, p2_ycut, "p2, y={:4.2f}".format(y_true), 0.1)
 
@@ -341,23 +352,23 @@ def plot_solution():
 
     #fd_plots = []
     #an_plots = []
-    p1_plt, = ax.plot(x, p1_fd, linewidth=3, color='blue', label="p1, fd")
-
+    p1_plt, = ax.plot(x, p1_fd, color='red', label="p1, fd")
     #fd_plots.append(p1_plt)
     p1_an = ac.vec_eval_p1(x)
-    p1_plt, = ax.plot(x, p1_an, color='orange', label="p1, an")
+    #p1_plt, = ax.plot(x, p1_an, color='orange', label="p1, an")
     #an_plots.append(p1_plt)
     add_text(ax, p1_fd, "p1", -0.3)
-
     ax_err.plot(x, p1_fd - p1_an, color='red', label="p1_diff")
 
+
     ax.set_xlabel("x")
+    ax.set_ylabel("pressure")
     ax.set_ylim((4.5,10.5))
 
     #ax_err.legend(bbox_to_anchor=(1.05, 1), loc=0, borderaxespad=0.)
     ax_err.legend(loc=9)
     ax_err.set_xlabel("x")
-    ax_err.set_ylabel("difference")
+    ax_err.set_ylabel("pressure difference")
     ax_err.ticklabel_format(style='sci', scilimits=(0,0))
 
     #y = (ac.P1 - ac.P2) * np.cosh( x/ac.k1) / np.cosh(1/ac.k1) + ac.P2
@@ -387,7 +398,7 @@ def plot_solution():
     # ax_right.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
     # ax_right.set_xlabel("Y direction")
 
-    plt.savefig("continuous_solution.pdf", bbox_inches='tight')
+    #plt.savefig("continuous_solution.pdf", bbox_inches='tight')
     plt.show()
     return
     # compute approx of -k2*\Lapl p_2 for analytical sol.
@@ -412,7 +423,7 @@ def plot_solution():
 
             Z[i,j] = (4* p2_11 - p2_21 - p2_01 - p2_10 - p2_12) / d /d
     #ax.plot_wireframe(X, Y, p2, rstride=10, cstride=10)
-    print(Z)
+    #print(Z)
     surf = ax.contourf(X, Y, Z, cmap=cm.coolwarm,
                            linewidth=0, antialiased=False)
 
@@ -459,14 +470,16 @@ def compute_error(n_terms, fd_n, k2, sigma, y_band=0.5):
 
     if y_band > 0:
         band = np.arange(int(ny/2*y_band), int(ny/2*1.1), 1)
-        print(fd_n, len(band), len(band)*len(x)*2.0/ nx * 2.0/ ny)
+        #print(fd_n, len(band), len(band)*len(x)*2.0/ nx * 2.0/ ny)
     else:
         band = np.arange(0, len(y), 1)
     an_p2_band = ac.vec_eval_p2(x[None, :], y[band, None])
     p2_diff = an_p2_band - p2[band, :]
 
     p2_l2 = la.norm(p2_diff.ravel()) * np.sqrt(2.0/ nx * 2.0/ ny)
-
+    
+    
+    print("Errors: ", "e1:", p1_l2, "e2:", p2_l2) 
     return p1_l2, p2_l2
 
     # fig = plt.figure(figsize=(15, 5))
@@ -534,6 +547,7 @@ def plot_decay(table, n_an, n_fd):
     for i, nfd in enumerate(n_fd):
         ax_an1.loglog(n_an, table[:, i, 0], color=p1_cmap(fd_norm(nfd)) , label="p1, $N_f$: {}".format(nfd))
         ax_an2.loglog(n_an, table[:, i, 1], color=p2_cmap(fd_norm(nfd)) , label="p2, $N_f$: {}".format(nfd))
+        
     #ax_an1.loglog(n_an, np.array(n_an) ** (-2.0), color = 'orange', label="$N^{-2}$")
     #ax_an2.loglog(n_an, np.array(n_an) ** (-2.0), color='orange', label="$N^{-2}$")
     #ax_an1.set_xticklabels(n_an)
@@ -549,10 +563,25 @@ def plot_decay(table, n_an, n_fd):
     for i, nan in enumerate(n_an):
         ax_fd1.loglog(n_fd, table[i, :, 0], color=p1_cmap(an_norm(nan)), label="p1, $N_a$: {}".format(nan))
         ax_fd2.loglog(n_fd, table[i, :, 1], color=p2_cmap(an_norm(nan)), label="p2, $N_a$: {}".format(nan))
-    ax_fd1.loglog(n_fd, 1e2*np.array(n_fd) ** (-2.0), color = 'orange', label="ref. $N^{-2}$")
-    ax_fd2.loglog(n_fd, 1e2*np.array(n_fd) ** (-2.0), color='orange', label="ref. $N^{-2}$")
-    ax_fd1.set_ylim( 0.8*np.min(table[:, :, 0].ravel()), 1.2*np.max(table[:, :, 0].ravel()) )
-    ax_fd2.set_ylim( 0.8*np.min(table[:, :, 1].ravel()), 1.2*np.max(table[:, :, 1].ravel()) )
+        
+    #ax_fd1.loglog(n_fd, 1e2*np.array(n_fd) ** (-2.0), color = 'orange', label="ref. $N^{-2}$")
+    #ax_fd2.loglog(n_fd, 1e2*np.array(n_fd) ** (-2.0), color='orange', label="ref. $N^{-2}$")
+    
+    # Fit for last an
+    n_fd  = np.array(n_fd)
+    fit_p1 = np.polyfit(-np.log10(n_fd), np.log10(table[-1,:,0]), deg = 1)   #P1
+    fit_p2 = np.polyfit(-np.log10(n_fd), np.log10(table[-1,:,1]), deg = 1)   #P2
+    print("Fit p1:", fit_p1, 10**(fit_p1[1] - n_fd * fit_p1[0])) 
+    print("Fit p2:", fit_p2, 10**(fit_p2[1] - n_fd * fit_p2[0]))
+
+    
+    ax_fd1.loglog(n_fd, 10**(fit_p1[1] - np.log10(n_fd) * fit_p1[0]), color='red', label="fit p1")
+    ax_fd2.loglog(n_fd, 10**(fit_p2[1] - np.log10(n_fd) * fit_p2[0]), color='green', label="fit p2")
+    
+    
+    #ax_fd1.set_ylim( 0.8*np.min(table[:, :, 0].ravel()), 1.2*np.max(table[:, :, 0].ravel()) )
+    #ax_fd2.set_ylim( 0.8*np.min(table[:, :, 1].ravel()), 1.2*np.max(table[:, :, 1].ravel()) )
+    
     #ax_fd1.set_xticks(n_fd)
     #ax_fd2.set_xticks(n_fd)
     #ax_fd1.set_xlabel("Finite diferences. \# of points on one side $[N_f]$.")
@@ -574,8 +603,8 @@ def error_decay(plot = False):
     Using fixed problem parameters.
     :return:
     """
-    k1=0.1
-    sigma = 1
+    k2=1e-5
+    sigma = 10
 
     # n_terms_list =  [10, 100, 1000, 10000]
     # nx_list = [10, 20, 40, 80, 160, 320]
@@ -586,27 +615,37 @@ def error_decay(plot = False):
     err_table = np.empty((len(n_terms_list), len(nx_list), 2))
     for i, n_terms in enumerate(n_terms_list):
         for j, nx in enumerate(nx_list):
-            err_table[i,j,:] = compute_error(n_terms, nx, k1, sigma)
+            err_table[i,j,:] = compute_error(n_terms, nx, k2, sigma, y_band=0.1)
 
     plot_decay(err_table, n_terms_list, nx_list)
 
-
 def error_decay_parameter_study():
-    sigma_bounds = np.arange(-2, 4, 0.25)
-    k1_bounds = np.arange(-2, 4, 0.25)
+    #sigma_bounds = np.arange(-2, 4, 0.25)
+    #k2_bounds = np.arange(-2, 4, 0.25)
+
+    step=0.25
+    sigma_bounds = np.arange(-5, 1+step, step)
+    k2_bounds = np.arange(-5, 1+step, step)
+
     sigma_list = (sigma_bounds[0:-1] + sigma_bounds[1:])/2
-    k1_list = (k1_bounds[0:-1] + k1_bounds[1:]) / 2
-    fit_table = np.empty( (len(sigma_list), len(k1_list), 2, 2))
+    k2_list = (k2_bounds[0:-1] + k2_bounds[1:]) / 2
+    fit_table = np.empty( (len(sigma_list), len(k2_list), 2, 2))
     for isg, sigma_log in enumerate(sigma_list):
-        for ik1, k1_log in enumerate(k1_list):
+        for ik2, k2_log in enumerate(k2_list):
+            print("Case: sigma ", sigma_log, " k2 ", k2_log)
             sigma = 10.0**sigma_log
-            k1 = 10.0**k1_log
+            k2 = 10.0**k2_log            
             nx_list = [20, 40, 80, 160, 320]
+            #nx_list = [20, 40, 80]
             err_table = np.empty( (len(nx_list), 2) )
             for inx, nx in enumerate(nx_list):
-                err_table[inx, :] = compute_error(100, nx, k1, sigma, y_band=0.1)
-            fit_table[isg, ik1,:, :] = np.polyfit(np.log(np.array(nx_list)), np.log2(err_table[:,:]), deg = 1)
-
+                err_table[inx, :] = compute_error(200, nx, k2, sigma, y_band=0.05)
+            fit_table[isg, ik2,:, 0] = np.polyfit(-np.log10(np.array(nx_list)), np.log10(err_table[:,0]), deg = 1)   #P1
+            fit_table[isg, ik2,:, 1] = np.polyfit(-np.log10(np.array(nx_list)), np.log10(err_table[:,1]), deg = 1)   #P2
+            print("Fit p1:", fit_table[isg, ik2,:, 0]) 
+            print("Fit p2:", fit_table[isg, ik2,:, 1])
+            # polyfit returns highest power first !!
+    
     fig = plt.figure(figsize=(16, 3))
 
     ax = fig.add_subplot(141)
@@ -618,45 +657,51 @@ def error_decay_parameter_study():
         fig.add_subplot(144, sharey = ax)
     ]
     im_list =[]
-    X,Y = np.meshgrid(10.0**sigma_bounds, 10.0**k1_bounds)
-
-    cm = [ matplotlib.cm.get_cmap('plasma'), matplotlib.cm.get_cmap('viridis') ]
+    X,Y = np.meshgrid(10.0**sigma_bounds[:-1], 10.0**k2_bounds[:-1])
+    
+    # color map and normalization for: conv. order, err. magnitude
+    cm = [ matplotlib.cm.get_cmap('seismic'), matplotlib.cm.get_cmap('PRGn')]
+    divnorm = [mcolors.DivergingNorm(vcenter=2), mcolors.DivergingNorm(vcenter=0)]
     for i_deg in [0, 1]:
         for i_dim in [0, 1]:
             ii = i_dim +  2*i_deg
             ax = ax_list[ii]
             #ax.axis('equal')
-            im = ax.pcolormesh(X, Y, -fit_table[:,:, i_deg, i_dim], cmap=cm[i_deg])
+            im = ax.pcolormesh(X, Y, fit_table[:,:, i_deg, i_dim], cmap=cm[i_deg], norm=divnorm[i_deg])
             ax.set_xscale('log')
             ax.set_yscale('log')
             im_list.append(im)
             #ax.set_xticks(np.arange(0, len(sigma_list), 1))
-            #ax.set_yticks(np.arange(0, len(k1_list), 1))
+            #ax.set_yticks(np.arange(0, len(k2_list), 1))
             #ax.set_xticklabels(10.0 ** sigma_list)
-            #ax.set_yticklabels(10.0 ** k1_list)
+            #ax.set_yticklabels(10.0 ** k2_list)
             #ax.ticklabel_format(style='sci', scilimits=(0, 0))
 
+            ax.yaxis.set_minor_locator(plt.NullLocator())
+            ax.xaxis.set_major_locator(plt.LogLocator(numticks=4))
+            ax.yaxis.set_major_locator(plt.LogLocator(numticks=7))
 
-            ax.tick_params(
-                axis='both',  # changes apply to the x-axis
-                which='minor',  # both major and minor ticks are affected
-                left='off',
-                bottom='off')  # labels along the bottom edge are off
+
+            #ax.tick_params(
+                #axis='both',  # changes apply to the x-axis
+                #which='minor',  # both major and minor ticks are affected
+                #left='off',
+                #bottom='off')  # labels along the bottom edge are off
 
             if ii > 0:
-                ax.tick_params(
-                    axis='y',  # changes apply to the x-axis
-                    which='both',  # both major and minor ticks are affected
-                    labelleft='off')  # labels along the bottom edge are off
+                plt.setp(ax.get_yticklabels(), visible=False)
 
 
-    ax_list[0].set_xlabel("$\sigma$, order, p1 ")
-    ax_list[1].set_xlabel("$\sigma$, order, p2 ")
-    ax_list[2].set_xlabel("$\sigma$, abs_err, p1 ")
-    ax_list[3].set_xlabel("$\sigma$, abs_err, p2 ")
-    fig.colorbar(im_list[0], ax=ax_list[:2])
-    fig.colorbar(im_list[2], ax=ax_list[2:])
-
+    ax_list[0].set_xlabel("$\sigma$, p1")
+    ax_list[1].set_xlabel("$\sigma$, p2")
+    ax_list[2].set_xlabel("$\sigma$, p1")
+    ax_list[3].set_xlabel("$\sigma$, p2")
+    
+    cbar_order = fig.colorbar(im_list[0], ax=ax_list[:2])
+    cbar_order.set_label("order of convergece", rotation=90)
+    cbar_magnitude = fig.colorbar(im_list[2], ax=ax_list[2:])
+    cbar_magnitude.set_label("error magnitude, log10", rotation=90)
+    
     # Adding the colorbar
     # cb_ax = fig.add_axes([0.1, 0.1, 0.03, 0.8])  # This is the position for the colorbar
     # fig.colorbar(im_list[0], cax=cb_ax)
@@ -670,7 +715,7 @@ def error_decay_parameter_study():
     plt.show()
 
 
-plot_solution()
+#plot_solution()
 
 
 #p1_l2, p2_l2, p1_diff, p2_diff = compute_error(100, 100, 0.01, 1, y_band=False)
